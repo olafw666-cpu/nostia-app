@@ -1,0 +1,252 @@
+﻿# Dependencies - NEVER commit these
+node_modules/
+.expo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs - NEVER commit these
+dist/
+build/
+*.tgz
+.DS_Store
+Thumbs.db
+
+# Environment - NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files - NEVER commit these
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+*.tmp
+*.temp
+
+# OS files - NEVER commit these
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Mobile specific - NEVER commit these
+*.mobileprovision
+*.keystore
+*.jks
+*.pem
+*.p12
+
+# Expo specific - NEVER commit these
+.expo/
+.expo-shared/
+node_modules/
+
+# React Native specific - NEVER commit these
+ios/Pods/
+android/.gradle/
+android/build/
+android/local.properties
+ios/build/
+*.xcworkspace
+*.xcuserdata
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+
+# Node.js specific - NEVER commit these
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Build artifacts - NEVER commit these
+dist/
+build/
+*.tgz
+*.tar.gz
+*.zip
+
+# Environment variables - NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE specific - NEVER commit these
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+*.tmp
+*.temp
+
+# OS specific - NEVER commit these
+.DS_Store
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+
+# Mobile development - NEVER commit these
+*.mobileprovision
+*.keystore
+*.jks
+*.p12
+*.pem
+
+# React Native specific - NEVER commit these
+ios/Pods/
+android/.gradle/
+android/build/
+android/local.properties
+ios/build/
+*.xcworkspace
+*.xcuserdata
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+
+# Expo specific - NEVER commit these
+.expo/
+.expo-shared/
+node_modules/
+
+# Package manager specific - NEVER commit these
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Development tools - NEVER commit these
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+*.tmp
+*.temp
+
+# System files - NEVER commit these
+.DS_Store
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+
+# Security sensitive - NEVER commit these
+*.pem
+*.p12
+*.key
+*.crt
+*.csr
+*.jks
+*.keystore
+*.mobileprovision
+
+# Build outputs - NEVER commit these
+dist/
+build/
+out/
+target/
+bin/
+obj/
+*.exe
+*.dll
+*.so
+*.dylib
+*.tgz
+*.tar.gz
+*.zip
+
+# Environment and secrets - NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.example
+.envrc
+.env.template
+
+# IDE and editor specific - NEVER commit these
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# OS specific - NEVER commit these
+.DS_Store
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Node.js specific - NEVER commit these
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+npm-shrinkwrap.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+lerna-debug.log*
+
+# React Native specific - NEVER commit these
+ios/Pods/
+android/.gradle/
+android/build/
+android/local.properties
+ios/build/
+*.xcworkspace
+*.xcuserdata
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+*.xcscmblueprint
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+*.mode1v3
+*.mode2v3
