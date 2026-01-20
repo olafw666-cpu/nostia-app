@@ -69,10 +69,10 @@ export default function LoginScreen() {
       await SecureStore.setItemAsync('jwt_token', token);
       
       Alert.alert(
-        'Success!', 
+        'Success!',
         `Welcome back, ${user.name || username}!`,
         [
-          { text: 'OK', onPress: () => navigation.navigate('Home') }
+          { text: 'OK', onPress: () => (navigation as any).replace('Main') }
         ]
       );
       
