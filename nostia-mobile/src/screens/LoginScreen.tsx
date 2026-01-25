@@ -1,200 +1,237 @@
-﻿import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
-import api from '../services/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { authAPI } from '../services/api';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [backendStatus, setBackendStatus] = useState('🔄 Checking backend...');
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
 
-  // Test backend connection on mount
-  useEffect(() => {
-    testBackendConnection();
-  }, []);
-
-  const testBackendConnection = async () => {
-    try {
-      const endpoints = [
-        'http://192.168.40.16:3000/',           // Your actual IP
-        'http://localhost:3000/',               // Local development
-      ];
-      
-      for (const endpoint of endpoints) {
-        try {
-          const response = await api.get(endpoint);
-          setBackendStatus('✅ Backend Connected!');
-          return;
-        } catch (e) {
-          console.log(`Tried ${endpoint}: failed`);
-        }
-      }
-      setBackendStatus('❌ Backend Error - Check if server is running');
-    } catch (error) {
-      setBackendStatus('❌ Backend Error');
-      console.log('Backend connection failed:', error.message);
-    }
-  };
-
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-    
-    console.log('Attempting login with:', { username: username.trim(), password });
-    console.log('API base URL:', api.defaults.baseURL);
-
-    if (backendStatus.includes('❌')) {
-      Alert.alert('Error', 'Cannot login - backend not connected');
+      Alert.alert('Missing Information', 'Please enter your username and password');
       return;
     }
 
     setLoading(true);
-    
+
     try {
-      const response = await api.post('/auth/login', {
-        username: username.trim(),
-        password: password,
-      });
+      const response = await authAPI.login(username.trim(), password);
 
-      console.log('Login success:', response.data);
-
-      const { token, user } = response.data;
-      
-      // Store token securely
-      await SecureStore.setItemAsync('jwt_token', token);
-      
-      Alert.alert(
-        'Success!',
-        `Welcome back, ${user.name || username}!`,
-        [
-          { text: 'OK', onPress: () => (navigation as any).replace('Main') }
-        ]
-      );
-      
-    } catch (error) {
+      Alert.alert('Welcome Back!', `Hello, ${response.user?.name || username}!`, [
+        { text: 'OK', onPress: () => (navigation as any).replace('Main') },
+      ]);
+    } catch (error: any) {
       console.log('Login error:', error.response?.data || error.message);
-      
+
       if (error.response?.status === 401) {
         Alert.alert('Login Failed', 'Invalid username or password');
       } else if (error.response?.status === 404) {
         Alert.alert('Login Failed', 'User not found');
       } else {
-        Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
+        Alert.alert('Login Failed', error.response?.data?.error || 'An error occurred. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignup = () => {
-    navigation.navigate('Signup');
-  };
-
   return (
-    <View style={styles.container}>
-      <View style={styles.innerContainer}>
-        <Text style={styles.title}>🎒 Nostia Login</Text>
-        <Text style={styles.status}>{backendStatus}</Text>
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          editable={!loading}
-        />
-        
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={handleLogin}
-          disabled={loading || backendStatus.includes('❌')}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <LinearGradient
+          colors={['#3B82F6', '#8B5CF6']}
+          style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity onPress={handleSignup} style={styles.linkButton}>
-          <Text style={styles.linkText}>Don't have an account? Sign up</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <Ionicons name="compass" size={64} color="#FFFFFF" />
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to continue your adventure</Text>
+        </LinearGradient>
+
+        {/* Form */}
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your username"
+              placeholderTextColor="#6B7280"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your password"
+              placeholderTextColor="#6B7280"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!loading}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.loginButtonContainer}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#3B82F6', '#8B5CF6']}
+              style={styles.loginButton}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="log-in" size={20} color="#FFFFFF" />
+                  <Text style={styles.loginButtonText}>Login</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.signupLink}
+            onPress={() => navigation.navigate('Signup' as never)}
+          >
+            <Text style={styles.signupLinkText}>
+              Don't have an account? <Text style={styles.signupLinkBold}>Sign Up</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#111827',
   },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  header: {
+    padding: 40,
+    paddingTop: 80,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    color: '#FFFFFF',
+    marginTop: 16,
   },
-  status: {
+  subtitle: {
+    fontSize: 16,
+    color: '#E0E7FF',
+    marginTop: 8,
+  },
+  form: {
+    flex: 1,
+    padding: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
     fontSize: 14,
-    marginBottom: 5,
-    color: '#28a745',
+    fontWeight: '600',
+    color: '#D1D5DB',
+    marginBottom: 8,
   },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
+    color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd',
-    width: '100%',
+    borderColor: '#374151',
   },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 15,
+  loginButtonContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    padding: 18,
     alignItems: 'center',
-    marginTop: 10,
-    width: '100%',
+    justifyContent: 'center',
+    gap: 8,
   },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
+  loginButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
   },
-  linkButton: {
-    marginTop: 20,
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#374151',
   },
-  linkText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#007AFF',
+  dividerText: {
     fontSize: 14,
+    color: '#6B7280',
+    marginHorizontal: 16,
+  },
+  signupLink: {
+    alignItems: 'center',
+  },
+  signupLinkText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  signupLinkBold: {
+    fontWeight: 'bold',
+    color: '#3B82F6',
   },
 });

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { tripsAPI } from '../services/api';
 import CreateTripModal from '../components/CreateTripModal';
+import AIChatModal from '../components/AIChatModal';
 
 export default function TripsScreen() {
   const navigation = useNavigation();
@@ -21,6 +22,8 @@ export default function TripsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [selectedTripForAI, setSelectedTripForAI] = useState<any>(null);
 
   useEffect(() => {
     loadTrips();
@@ -54,10 +57,34 @@ export default function TripsScreen() {
     (navigation as any).navigate('Vault', { tripId: trip.id, tripTitle: trip.title });
   };
 
+  const handleDeleteTrip = (trip: any) => {
+    Alert.alert(
+      'Delete Trip',
+      `Are you sure you want to delete "${trip.title}"? This will remove all associated data including expenses, photos, and participants.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await tripsAPI.delete(trip.id);
+              Alert.alert('Success', 'Trip deleted successfully');
+              loadTrips();
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.error || 'Failed to delete trip');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderTripCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => handleViewVault(item)}
+      onLongPress={() => handleDeleteTrip(item)}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
@@ -83,9 +110,21 @@ export default function TripsScreen() {
           <Ionicons name="people-outline" size={18} color="#9CA3AF" />
           <Text style={styles.statText}>{item.participants?.length || 0} people</Text>
         </View>
-        <View style={styles.statItem}>
-          <Ionicons name="wallet-outline" size={18} color="#10B981" />
-          <Text style={styles.vaultText}>View Vault</Text>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.aiButton}
+            onPress={() => {
+              setSelectedTripForAI(item);
+              setShowAIChat(true);
+            }}
+          >
+            <Ionicons name="sparkles" size={16} color="#A78BFA" />
+            <Text style={styles.aiButtonText}>AI Plan</Text>
+          </TouchableOpacity>
+          <View style={styles.statItem}>
+            <Ionicons name="wallet-outline" size={18} color="#10B981" />
+            <Text style={styles.vaultText}>Vault</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -141,6 +180,19 @@ export default function TripsScreen() {
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onTripCreated={handleTripCreated}
+      />
+
+      <AIChatModal
+        visible={showAIChat}
+        onClose={() => {
+          setShowAIChat(false);
+          setSelectedTripForAI(null);
+        }}
+        tripContext={selectedTripForAI}
+        onGenerateItinerary={(itinerary) => {
+          console.log('Generated itinerary:', itinerary);
+          Alert.alert('Success', 'Itinerary generated! Check the AI chat for details.');
+        }}
       />
     </View>
   );
@@ -226,6 +278,25 @@ const styles = StyleSheet.create({
   vaultText: {
     fontSize: 14,
     color: '#10B981',
+    fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  aiButtonText: {
+    fontSize: 12,
+    color: '#A78BFA',
     fontWeight: '600',
   },
   emptyContainer: {

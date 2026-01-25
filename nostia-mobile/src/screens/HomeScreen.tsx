@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,16 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { authAPI, tripsAPI, eventsAPI, friendsAPI } from '../services/api';
+import { getCurrentLocation, requestLocationPermission, LocationData } from '../services/location';
+import type { LocationSubscription } from 'expo-location';
+import AIChatModal from '../components/AIChatModal';
+import { moderateScale, isSmallScreen } from '../utils/responsive';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -22,10 +27,59 @@ export default function HomeScreen() {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [nearbyEvents, setNearbyEvents] = useState<any[]>([]);
+  const locationFetchedRef = useRef(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [selectedTripForAI, setSelectedTripForAI] = useState<any>(null);
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     loadData();
+    initializeLocation();
   }, []);
+
+  const initializeLocation = async () => {
+    if (locationFetchedRef.current) return;
+    locationFetchedRef.current = true;
+
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        setLocationPermissionDenied(true);
+        return;
+      }
+
+      const currentLocation = await getCurrentLocation();
+      if (currentLocation) {
+        setLocation(currentLocation);
+        // Update user's location on backend
+        try {
+          await authAPI.updateMe({
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+          });
+        } catch (error) {
+          console.log('Failed to update location on server:', error);
+        }
+
+        // Fetch nearby events
+        try {
+          const nearby = await eventsAPI.getNearby(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            50 // 50km radius
+          );
+          setNearbyEvents(nearby);
+        } catch (error) {
+          console.log('Failed to fetch nearby events:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing location:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -135,6 +189,25 @@ export default function HomeScreen() {
         </Text>
       </View>
 
+      {/* Location Status */}
+      <View style={styles.locationCard}>
+        <View style={styles.locationHeader}>
+          <Ionicons
+            name={location ? "location" : "location-outline"}
+            size={20}
+            color={location ? "#10B981" : locationPermissionDenied ? "#EF4444" : "#9CA3AF"}
+          />
+          <Text style={styles.locationTitle}>Location</Text>
+        </View>
+        <Text style={styles.locationStatus}>
+          {location
+            ? `Location active`
+            : locationPermissionDenied
+              ? 'Permission denied - enable in settings'
+              : 'Fetching location...'}
+        </Text>
+      </View>
+
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
@@ -193,11 +266,50 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Nearby Events Preview */}
-      {events.length > 0 && (
+      {/* Nearby Events Preview (location-based) */}
+      {nearbyEvents.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Nearby Events</Text>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('DiscoverTab')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {nearbyEvents.slice(0, 3).map((event: any) => (
+            <View key={event.id} style={styles.eventPreviewCard}>
+              <View style={styles.eventPreviewHeader}>
+                <Text style={styles.eventPreviewTitle}>{event.title}</Text>
+                {event.distance !== undefined && (
+                  <View style={styles.distanceBadge}>
+                    <Text style={styles.distanceText}>
+                      {event.distance < 1
+                        ? `${Math.round(event.distance * 1000)}m`
+                        : `${event.distance.toFixed(1)}km`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.eventPreviewLocation}>
+                <Ionicons name="location-outline" size={14} /> {event.location}
+              </Text>
+              <Text style={styles.eventPreviewDate}>
+                {new Date(event.eventDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Upcoming Events (fallback if no location) */}
+      {nearbyEvents.length === 0 && events.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Upcoming Events</Text>
             <TouchableOpacity onPress={() => (navigation as any).navigate('DiscoverTab')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -220,6 +332,40 @@ export default function HomeScreen() {
           ))}
         </View>
       )}
+
+      {/* Floating AI Assistant Button */}
+      <TouchableOpacity
+        style={styles.floatingAIButton}
+        onPress={() => {
+          setSelectedTripForAI(null);
+          setShowAIChat(true);
+        }}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#8B5CF6', '#3B82F6']}
+          style={styles.floatingAIButtonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+        </LinearGradient>
+        <View style={styles.aiButtonIndicator} />
+      </TouchableOpacity>
+
+      {/* AI Chat Modal */}
+      <AIChatModal
+        visible={showAIChat}
+        onClose={() => {
+          setShowAIChat(false);
+          setSelectedTripForAI(null);
+        }}
+        tripContext={selectedTripForAI}
+        onGenerateItinerary={(itinerary) => {
+          console.log('Generated itinerary:', itinerary);
+          Alert.alert('Success', 'Itinerary generated!');
+        }}
+      />
     </ScrollView>
   );
 }
@@ -406,9 +552,79 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginBottom: 4,
   },
+  eventPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
   eventPreviewDate: {
     fontSize: 14,
     color: '#F59E0B',
     fontWeight: '600',
+  },
+  distanceBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  locationCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  locationStatus: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 28,
+  },
+  floatingAIButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    zIndex: 100,
+  },
+  floatingAIButtonGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  aiButtonIndicator: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#111827',
   },
 });

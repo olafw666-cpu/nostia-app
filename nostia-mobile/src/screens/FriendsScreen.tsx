@@ -12,9 +12,11 @@ import {
   SectionList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { friendsAPI } from '../services/api';
+import { useNavigation } from '@react-navigation/native';
+import { friendsAPI, messagesAPI } from '../services/api';
 
 export default function FriendsScreen() {
+  const navigation = useNavigation<any>();
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState({ received: [], sent: [] });
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +100,20 @@ export default function FriendsScreen() {
     }
   };
 
+  const handleOpenChat = async (friend: any) => {
+    try {
+      // Get or create conversation with this friend
+      const conversation = await messagesAPI.getOrCreateConversation(friend.id);
+      navigation.navigate('Chat', {
+        conversationId: conversation.id,
+        friendName: friend.name,
+        friendId: friend.id,
+      });
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to open chat');
+    }
+  };
+
   const renderFriendCard = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.friendAvatar}>
@@ -107,10 +123,18 @@ export default function FriendsScreen() {
         <Text style={styles.friendName}>{item.name}</Text>
         <Text style={styles.friendUsername}>@{item.username}</Text>
       </View>
-      <View style={[styles.statusBadge, item.homeStatus === 'open' ? styles.openBadge : styles.closedBadge]}>
-        <Text style={styles.statusText}>
-          {item.homeStatus === 'open' ? '🏠 Open' : '🔒 Closed'}
-        </Text>
+      <View style={styles.friendActions}>
+        <TouchableOpacity
+          style={styles.messageButton}
+          onPress={() => handleOpenChat(item)}
+        >
+          <Ionicons name="chatbubble" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
+        <View style={[styles.statusBadge, item.homeStatus === 'open' ? styles.openBadge : styles.closedBadge]}>
+          <Text style={styles.statusText}>
+            {item.homeStatus === 'open' ? '🏠 Open' : '🔒 Closed'}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -373,6 +397,19 @@ const styles = StyleSheet.create({
   friendUsername: {
     fontSize: 14,
     color: '#9CA3AF',
+  },
+  friendActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  messageButton: {
+    backgroundColor: '#3B82F6',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statusBadge: {
     paddingHorizontal: 12,

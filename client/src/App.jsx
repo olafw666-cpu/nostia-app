@@ -19,7 +19,11 @@ import {
   Loader,
   Bot,
   Sparkles,
-  Wand2
+  Wand2,
+  Heart,
+  MessageCircle,
+  Send,
+  Image
 } from "lucide-react";
 import {
   authAPI,
@@ -30,6 +34,8 @@ import {
   feedAPI,
   vaultAPI,
   aiAPI,
+  notificationsAPI,
+  messagesAPI,
   getToken,
   getCurrentUser,
 } from "./api";
@@ -79,6 +85,20 @@ function App() {
   const [splitMode, setSplitMode] = useState('equal'); // 'equal', 'percentage', 'custom'
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiTripContext, setAITripContext] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [nearbyEvents, setNearbyEvents] = useState([]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -88,16 +108,39 @@ function App() {
       setIsAuthenticated(true);
       setUser(savedUser);
       loadData();
+      requestLocation();
     } else {
       setShowAuthModal(true);
     }
   }, []);
 
+  // Request user location
+  const requestLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+          // Load nearby events
+          try {
+            const nearby = await eventsAPI.getNearby(latitude, longitude, 50);
+            setNearbyEvents(nearby);
+          } catch (err) {
+            console.log('Could not load nearby events');
+          }
+        },
+        (error) => {
+          console.log('Location permission denied or unavailable');
+        }
+      );
+    }
+  };
+
   // Load all data
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tripsData, friendsData, requestsData, eventsData, adventuresData, feedData, invitationsData] = await Promise.all([
+      const [tripsData, friendsData, requestsData, eventsData, adventuresData, feedData, invitationsData, notificationsData, unreadData] = await Promise.all([
         tripsAPI.getAll(),
         friendsAPI.getAll(),
         friendsAPI.getRequests(),
@@ -105,6 +148,8 @@ function App() {
         adventuresAPI.getAll(),
         feedAPI.getUserFeed(20),
         tripsAPI.getInvitations(),
+        notificationsAPI.getAll().then(data => data?.notifications || []).catch(() => []),
+        notificationsAPI.getUnreadCount().catch(() => ({ unreadCount: 0 })),
       ]);
 
       setTrips(tripsData);
@@ -114,6 +159,8 @@ function App() {
       setAdventures(adventuresData);
       setFeed(feedData);
       setTripInvitations(invitationsData);
+      setNotifications(notificationsData);
+      setUnreadNotifications(unreadData.unreadCount || 0);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -468,6 +515,156 @@ function App() {
     }
   };
 
+  // Delete trip handler
+  const handleDeleteTrip = async (tripId) => {
+    if (!window.confirm('Are you sure you want to delete this trip? This cannot be undone.')) {
+      return;
+    }
+    try {
+      await tripsAPI.delete(tripId);
+      setTrips(trips.filter(t => t.id !== tripId));
+      toast.success('Trip deleted successfully');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Like/unlike post handler
+  const handleLikePost = async (postId, isLiked) => {
+    try {
+      if (isLiked) {
+        await feedAPI.unlikePost(postId);
+      } else {
+        await feedAPI.likePost(postId);
+      }
+      // Update feed locally
+      setFeed(feed.map(post =>
+        post.id === postId
+          ? { ...post, isLiked: !isLiked, likeCount: isLiked ? post.likeCount - 1 : post.likeCount + 1 }
+          : post
+      ));
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Open comments modal
+  const handleOpenComments = async (post) => {
+    setSelectedPost(post);
+    setShowCommentsModal(true);
+    try {
+      const commentsData = await feedAPI.getComments(post.id);
+      setComments(commentsData);
+    } catch (err) {
+      toast.error('Failed to load comments');
+    }
+  };
+
+  // Add comment handler
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim() || !selectedPost) return;
+    try {
+      await feedAPI.addComment(selectedPost.id, newComment);
+      const commentsData = await feedAPI.getComments(selectedPost.id);
+      setComments(commentsData);
+      setNewComment('');
+      // Update comment count in feed
+      setFeed(feed.map(post =>
+        post.id === selectedPost.id
+          ? { ...post, commentCount: (post.commentCount || 0) + 1 }
+          : post
+      ));
+      toast.success('Comment added');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Create post handler
+  const [postImageData, setPostImageData] = useState(null);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('Image must be less than 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPostImageData(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCreatePost = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const content = formData.get('content');
+
+    if (!content?.trim() && !postImageData) {
+      toast.error('Please add a photo or caption');
+      return;
+    }
+
+    try {
+      const postData = {
+        content: content?.trim() || '',
+        imageData: postImageData || undefined,
+      };
+      await feedAPI.createPost(postData);
+      const feedData = await feedAPI.getUserFeed(20);
+      setFeed(feedData);
+      setShowCreatePostModal(false);
+      setPostImageData(null);
+      e.target.reset();
+      toast.success('Post created!');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Open chat with friend
+  const handleOpenChat = async (friend) => {
+    try {
+      const conversation = await messagesAPI.getOrCreateConversation(friend.id);
+      setSelectedConversation({ ...conversation, friendName: friend.name, friendId: friend.id });
+      const messagesData = await messagesAPI.getMessages(conversation.id);
+      setMessages(messagesData);
+      setShowChatModal(true);
+    } catch (err) {
+      toast.error('Failed to open chat');
+    }
+  };
+
+  // Send message handler
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedConversation) return;
+    try {
+      await messagesAPI.sendMessage(selectedConversation.id, newMessage);
+      const messagesData = await messagesAPI.getMessages(selectedConversation.id);
+      setMessages(messagesData);
+      setNewMessage('');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  // Mark notifications as read
+  const handleMarkNotificationsRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      const notificationsList = Array.isArray(notifications) ? notifications : [];
+      setNotifications(notificationsList.map(n => ({ ...n, isRead: true, read: true })));
+      setUnreadNotifications(0);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   /* ---------- Views ---------- */
 
   const HomeView = () => (
@@ -522,6 +719,33 @@ function App() {
             : "Toggle to let friends know you're available"}
         </p>
       </div>
+
+      {/* Nearby Events */}
+      {nearbyEvents.length > 0 && (
+        <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-lg p-4 border border-green-700">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-green-400">📍</span>
+            <h3 className="font-semibold text-white">Nearby Events</h3>
+          </div>
+          <div className="space-y-2">
+            {nearbyEvents.slice(0, 3).map(event => (
+              <div key={event.id} className="bg-gray-800/50 p-3 rounded">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-white">{event.title}</p>
+                    <p className="text-xs text-gray-400">{event.location}</p>
+                  </div>
+                  {event.distance && (
+                    <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                      {event.distance < 1 ? `${(event.distance * 1000).toFixed(0)}m` : `${event.distance.toFixed(1)}km`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming Events */}
       <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
@@ -650,6 +874,15 @@ function App() {
                 >
                   <Wallet size={16} /> Vault
                 </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteTrip(trip.id);
+                  }}
+                  className="text-red-400 flex items-center gap-1 hover:text-red-300"
+                >
+                  <Trash2 size={16} /> Delete
+                </button>
               </div>
             </div>
           </div>
@@ -662,12 +895,74 @@ function App() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Discover</h2>
-        <button
-          onClick={() => setShowCreateEventModal(true)}
-          className="bg-purple-600 p-2 rounded-full hover:bg-purple-700"
-        >
-          <Plus size={20} />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCreatePostModal(true)}
+            className="bg-blue-600 p-2 rounded-full hover:bg-blue-700"
+          >
+            <Plus size={20} />
+          </button>
+          <button
+            onClick={() => setShowCreateEventModal(true)}
+            className="bg-purple-600 p-2 rounded-full hover:bg-purple-700"
+          >
+            <Calendar size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Feed Section */}
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-3">Feed</h3>
+        {feed.length === 0 ? (
+          <div className="bg-gray-900 p-6 rounded-lg text-center">
+            <p className="text-gray-400">No posts yet. Create the first one!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {feed.map(post => (
+              <div key={post.id} className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+                {/* Post header */}
+                <div className="p-3 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {post.username?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">@{post.username}</p>
+                    <p className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                {/* Post image if available */}
+                {post.imageData && (
+                  <div className="w-full aspect-square bg-gray-800">
+                    <img src={post.imageData} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                {/* Post content */}
+                <div className="p-3">
+                  <p className="text-white text-sm">{post.content}</p>
+                </div>
+                {/* Actions */}
+                <div className="px-3 pb-3 flex items-center gap-4">
+                  <button
+                    onClick={() => handleLikePost(post.id, post.isLiked)}
+                    className={`flex items-center gap-1 ${post.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
+                  >
+                    <Heart size={20} fill={post.isLiked ? 'currentColor' : 'none'} />
+                    <span className="text-sm">{post.likeCount || 0}</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenComments(post)}
+                    className="flex items-center gap-1 text-gray-400 hover:text-blue-400"
+                  >
+                    <MessageCircle size={20} />
+                    <span className="text-sm">{post.commentCount || 0}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Events Section */}
@@ -783,7 +1078,13 @@ function App() {
                   <p className="text-sm font-medium text-white">{friend.name}</p>
                   <p className="text-xs text-gray-400">@{friend.username}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleOpenChat(friend)}
+                    className="bg-blue-600 p-2 rounded-full hover:bg-blue-700"
+                  >
+                    <MessageCircle size={16} />
+                  </button>
                   <span className={`w-2 h-2 rounded-full ${
                     friend.homeStatus === 'open' ? 'bg-green-500' : 'bg-gray-500'
                   }`} />
@@ -796,10 +1097,56 @@ function App() {
     </div>
   );
 
+  const NotificationsView = () => {
+    const notificationsList = Array.isArray(notifications) ? notifications : [];
+    return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white">Notifications</h2>
+        {notificationsList.length > 0 && (
+          <button
+            onClick={handleMarkNotificationsRead}
+            className="text-sm text-blue-400 hover:text-blue-300"
+          >
+            Mark all as read
+          </button>
+        )}
+      </div>
+
+      {notificationsList.length === 0 ? (
+        <div className="bg-gray-900 p-6 rounded-lg text-center">
+          <Bell size={32} className="mx-auto mb-2 text-gray-600" />
+          <p className="text-gray-400">No notifications yet</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {notificationsList.map(notification => (
+            <div
+              key={notification.id}
+              className={`p-4 rounded-lg border ${
+                (notification.isRead || notification.read)
+                  ? 'bg-gray-900 border-gray-800'
+                  : 'bg-blue-900/20 border-blue-700'
+              }`}
+            >
+              <p className="text-sm font-medium text-white">{notification.title || 'Notification'}</p>
+              <p className="text-sm text-gray-300">{notification.body || notification.message}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {new Date(notification.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+  };
+
   const renderView = () => {
     if (currentView === "trips") return <TripsView />;
     if (currentView === "discover") return <DiscoverView />;
     if (currentView === "friends") return <FriendsView />;
+    if (currentView === "notifications") return <NotificationsView />;
     return <HomeView />;
   };
 
@@ -1562,6 +1909,19 @@ function App() {
               <Users size={20} className="mx-auto" />
               Friends
             </motion.button>
+            <motion.button
+              onClick={() => setCurrentView("notifications")}
+              className={`relative ${currentView === "notifications" ? "text-blue-400" : "text-gray-500"}`}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Bell size={20} className="mx-auto" />
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-1 right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                </span>
+              )}
+              Alerts
+            </motion.button>
           </div>
         </div>
 
@@ -1572,6 +1932,183 @@ function App() {
         {showVaultModal && <VaultModal />}
         {showTripDetailsModal && <TripDetailsModal />}
         {showAuthModal && <AuthModal />}
+
+        {/* Create Post Modal */}
+        {showCreatePostModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">Create Post</h2>
+                <button onClick={() => {
+                  setShowCreatePostModal(false);
+                  setPostImageData(null);
+                }}>
+                  <X className="text-gray-400" />
+                </button>
+              </div>
+              <form onSubmit={handleCreatePost}>
+                {/* Image Preview/Upload */}
+                {postImageData ? (
+                  <div className="relative mb-4">
+                    <img
+                      src={postImageData}
+                      alt="Preview"
+                      className="w-full aspect-square object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPostImageData(null)}
+                      className="absolute top-2 right-2 bg-red-500 p-1 rounded-full hover:bg-red-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="block mb-4 cursor-pointer">
+                    <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
+                      <Image size={40} className="mx-auto mb-2 text-gray-500" />
+                      <p className="text-gray-400">Click to add a photo</p>
+                      <p className="text-xs text-gray-500 mt-1">Max 5MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+
+                <textarea
+                  name="content"
+                  placeholder="Write a caption..."
+                  rows={3}
+                  className="w-full bg-gray-800 text-white p-3 rounded mb-4 resize-none"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700"
+                >
+                  Post
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Comments Modal */}
+        {showCommentsModal && selectedPost && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full max-h-[80vh] flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">Comments</h2>
+                <button onClick={() => {
+                  setShowCommentsModal(false);
+                  setSelectedPost(null);
+                  setComments([]);
+                }}>
+                  <X className="text-gray-400" />
+                </button>
+              </div>
+
+              {/* Comments list */}
+              <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                {comments.length === 0 ? (
+                  <p className="text-gray-400 text-center">No comments yet</p>
+                ) : (
+                  comments.map(comment => (
+                    <div key={comment.id} className="bg-gray-800 p-3 rounded">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-white">@{comment.username}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300">{comment.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add comment form */}
+              <form onSubmit={handleAddComment} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="flex-1 bg-gray-800 text-white p-2 rounded"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 p-2 rounded hover:bg-blue-700"
+                >
+                  <Send size={20} />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Chat Modal */}
+        {showChatModal && selectedConversation && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full max-h-[80vh] flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">
+                  Chat with {selectedConversation.friendName}
+                </h2>
+                <button onClick={() => {
+                  setShowChatModal(false);
+                  setSelectedConversation(null);
+                  setMessages([]);
+                }}>
+                  <X className="text-gray-400" />
+                </button>
+              </div>
+
+              {/* Messages list */}
+              <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[300px]">
+                {messages.length === 0 ? (
+                  <p className="text-gray-400 text-center">No messages yet. Say hello!</p>
+                ) : (
+                  messages.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`p-3 rounded-lg max-w-[80%] ${
+                        msg.senderId === user?.id
+                          ? 'bg-blue-600 ml-auto'
+                          : 'bg-gray-800'
+                      }`}
+                    >
+                      <p className="text-sm text-white">{msg.content}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(msg.createdAt).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Send message form */}
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-gray-800 text-white p-2 rounded"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 p-2 rounded hover:bg-blue-700"
+                >
+                  <Send size={20} />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Payment Modal */}
         <PaymentModal
