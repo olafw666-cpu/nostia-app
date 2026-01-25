@@ -21,7 +21,17 @@ tmpclaude-*
 # Large AI model files - NEVER commit (too large for git)
 *.safetensors
 *.bin
-deepseek-finetuned/venv/
+*.gguf
+*.ggml
+*.pt
+*.pth
+*.onnx
+*.model
+
+# DeepSeek AI model folder - NEVER commit (large model files)
+deepseek-finetuned/
+deepseek*/
+ai-models/
 
 # Logs and output files
 *.output

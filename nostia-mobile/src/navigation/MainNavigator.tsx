@@ -1,17 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated } from 'react-native';
+import { Animated, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
 import TripsScreen from '../screens/TripsScreen';
 import AdventuresScreen from '../screens/AdventuresScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import { notificationsAPI } from '../services/api';
 
 const Tab = createBottomTabNavigator();
 
 export default function MainNavigator() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    loadUnreadCount();
+    // Poll for unread count every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadUnreadCount = async () => {
+    try {
+      const data = await notificationsAPI.getUnreadCount();
+      setUnreadCount(data.unreadCount || 0);
+    } catch (error) {
+      // Silently fail
+    }
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -26,6 +46,8 @@ export default function MainNavigator() {
             iconName = focused ? 'compass' : 'compass-outline';
           } else if (route.name === 'FriendsTab') {
             iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'NotificationsTab') {
+            iconName = focused ? 'notifications' : 'notifications-outline';
           } else {
             iconName = 'help-outline';
           }
@@ -33,6 +55,20 @@ export default function MainNavigator() {
           // Animated icon with scale and opacity transitions
           const scale = new Animated.Value(focused ? 1.1 : 1);
           const opacity = new Animated.Value(focused ? 1 : 0.6);
+
+          // Show badge for notifications
+          if (route.name === 'NotificationsTab' && unreadCount > 0) {
+            return (
+              <View>
+                <Animated.View style={{ transform: [{ scale }], opacity }}>
+                  <Ionicons name={iconName} size={size} color={color} />
+                </Animated.View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              </View>
+            );
+          }
 
           return (
             <Animated.View style={{ transform: [{ scale }], opacity }}>
@@ -83,6 +119,37 @@ export default function MainNavigator() {
         component={FriendsScreen}
         options={{ title: 'Friends', headerTitle: 'My Friends' }}
       />
+      <Tab.Screen
+        name="NotificationsTab"
+        component={NotificationsScreen}
+        options={{ title: 'Alerts', headerTitle: 'Notifications' }}
+        listeners={{
+          tabPress: () => {
+            // Refresh unread count when tab is pressed
+            setTimeout(loadUnreadCount, 500);
+          },
+        }}
+      />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    right: -8,
+    top: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+});

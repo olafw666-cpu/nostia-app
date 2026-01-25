@@ -1,6 +1,11 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('../database/db');
 
+// Log Stripe configuration status on load
+console.log('💳 Stripe Service Initialized');
+console.log(`   - Secret Key: ${process.env.STRIPE_SECRET_KEY ? '✅ Set (' + process.env.STRIPE_SECRET_KEY.slice(0, 7) + '...)' : '❌ Missing'}`);
+console.log(`   - Webhook Secret: ${process.env.STRIPE_WEBHOOK_SECRET ? '✅ Set' : '❌ Missing'}`);
+
 class StripeService {
   /**
    * Create a Stripe customer for a Nostia user
@@ -67,13 +72,25 @@ class StripeService {
    * @returns {Promise<object>} Stripe payment intent
    */
   static async createPaymentIntent(amount, currency, payerUserId, recipientUserId, vaultSplitId, tripId) {
+    console.log('💳 Creating Payment Intent:', {
+      amount,
+      currency,
+      payerUserId,
+      recipientUserId,
+      vaultSplitId,
+      tripId
+    });
+
     try {
       // Get payer details
       const payer = db.prepare('SELECT * FROM users WHERE id = ?').get(payerUserId);
 
       if (!payer) {
+        console.error('❌ Payer not found:', payerUserId);
         throw new Error('Payer user not found');
       }
+
+      console.log('   - Payer found:', payer.name, payer.email || '(no email)');
 
       // Get or create Stripe customer
       const customerId = await this.getOrCreateCustomer(
@@ -81,6 +98,8 @@ class StripeService {
         payer.email,
         payer.name
       );
+
+      console.log('   - Stripe customer ID:', customerId);
 
       // Create payment intent
       const paymentIntent = await stripe.paymentIntents.create({
@@ -96,6 +115,8 @@ class StripeService {
         automatic_payment_methods: { enabled: true },
         description: `Nostia Trip Vault Payment - Split #${vaultSplitId}`
       });
+
+      console.log('✅ Payment Intent created:', paymentIntent.id);
 
       // Record transaction in database
       db.prepare(`
@@ -116,7 +137,8 @@ class StripeService {
 
       return paymentIntent;
     } catch (error) {
-      console.error('Error creating payment intent:', error);
+      console.error('❌ Error creating payment intent:', error.message);
+      console.error('   Full error:', JSON.stringify(error, null, 2));
       throw error;
     }
   }
@@ -207,16 +229,23 @@ class StripeService {
    * @param {object} event - Stripe webhook event
    */
   static async handleWebhook(event) {
+    console.log('📥 Processing Stripe Webhook:', event.type);
+    console.log('   - Event ID:', event.id);
+    console.log('   - Object ID:', event.data.object.id);
+
     try {
       switch (event.type) {
         case 'payment_intent.succeeded':
           console.log('✅ Payment succeeded:', event.data.object.id);
+          console.log('   - Amount:', event.data.object.amount / 100, event.data.object.currency);
           await this.confirmPayment(event.data.object.id);
+          console.log('   - Vault split marked as paid');
           break;
 
         case 'payment_intent.payment_failed':
           console.log('❌ Payment failed:', event.data.object.id);
           const errorMessage = event.data.object.last_payment_error?.message || 'Payment failed';
+          console.log('   - Error:', errorMessage);
 
           db.prepare(`
             UPDATE vault_transactions
@@ -237,11 +266,20 @@ class StripeService {
           `).run(event.data.object.id);
           break;
 
+        case 'payment_intent.created':
+          console.log('ℹ️ Payment intent created:', event.data.object.id);
+          break;
+
+        case 'charge.succeeded':
+          console.log('ℹ️ Charge succeeded:', event.data.object.id);
+          break;
+
         default:
           console.log('ℹ️ Unhandled webhook event type:', event.type);
       }
     } catch (error) {
-      console.error('Error handling webhook:', error);
+      console.error('❌ Error handling webhook:', error.message);
+      console.error('   Stack:', error.stack);
       throw error;
     }
   }

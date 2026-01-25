@@ -9,18 +9,24 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { adventuresAPI, feedAPI } from '../services/api';
+import CreatePostModal from '../components/CreatePostModal';
+import CommentsModal from '../components/CommentsModal';
 
 export default function AdventuresScreen() {
   const [adventures, setAdventures] = useState([]);
-  const [feed, setFeed] = useState([]);
+  const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'adventures' | 'feed'>('adventures');
+  const [activeTab, setActiveTab] = useState<'adventures' | 'feed'>('feed');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
 
   const categories = [
     { id: 'all', label: 'All', icon: 'grid-outline' },
@@ -63,6 +69,60 @@ export default function AdventuresScreen() {
     return adventures.filter((adv: any) => adv.category === selectedCategory);
   };
 
+  const handleLike = async (postId: number, isLiked: boolean) => {
+    try {
+      if (isLiked) {
+        await feedAPI.unlikePost(postId);
+      } else {
+        await feedAPI.likePost(postId);
+      }
+      // Update local state
+      setFeed(feed.map(post =>
+        post.id === postId
+          ? { ...post, isLiked: !isLiked, likeCount: isLiked ? post.likeCount - 1 : post.likeCount + 1 }
+          : post
+      ));
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update like');
+    }
+  };
+
+  const handleOpenComments = (postId: number) => {
+    setSelectedPostId(postId);
+    setShowComments(true);
+  };
+
+  const handleCommentAdded = () => {
+    // Update comment count in local state
+    if (selectedPostId) {
+      setFeed(feed.map(post =>
+        post.id === selectedPostId
+          ? { ...post, commentCount: post.commentCount + 1 }
+          : post
+      ));
+    }
+  };
+
+  const handlePostCreated = () => {
+    setShowCreatePost(false);
+    loadData();
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const renderAdventureCard = ({ item }: { item: any }) => (
     <View style={styles.adventureCard}>
       <LinearGradient
@@ -101,23 +161,66 @@ export default function AdventuresScreen() {
 
   const renderFeedPost = ({ item }: { item: any }) => (
     <View style={styles.feedCard}>
+      {/* Header */}
       <View style={styles.feedHeader}>
         <View style={styles.feedAvatar}>
           <Text style={styles.feedInitial}>{item.name?.charAt(0) || 'U'}</Text>
         </View>
         <View style={styles.feedInfo}>
           <Text style={styles.feedName}>{item.name}</Text>
-          <Text style={styles.feedTime}>
-            {new Date(item.createdAt).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
+          <Text style={styles.feedTime}>{formatTime(item.createdAt)}</Text>
         </View>
       </View>
-      <Text style={styles.feedContent}>{item.content}</Text>
+
+      {/* Image */}
+      {item.imageData && (
+        <Image source={{ uri: item.imageData }} style={styles.feedImage} resizeMode="cover" />
+      )}
+
+      {/* Actions */}
+      <View style={styles.feedActions}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => handleLike(item.id, item.isLiked)}
+        >
+          <Ionicons
+            name={item.isLiked ? "heart" : "heart-outline"}
+            size={26}
+            color={item.isLiked ? "#EF4444" : "#FFFFFF"}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => handleOpenComments(item.id)}
+        >
+          <Ionicons name="chatbubble-outline" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Like count */}
+      {item.likeCount > 0 && (
+        <Text style={styles.likeCount}>
+          {item.likeCount} {item.likeCount === 1 ? 'like' : 'likes'}
+        </Text>
+      )}
+
+      {/* Caption */}
+      {item.content && (
+        <View style={styles.captionContainer}>
+          <Text style={styles.captionName}>{item.name}</Text>
+          <Text style={styles.captionText}>{item.content}</Text>
+        </View>
+      )}
+
+      {/* Comment count */}
+      {item.commentCount > 0 && (
+        <TouchableOpacity onPress={() => handleOpenComments(item.id)}>
+          <Text style={styles.commentCountText}>
+            View all {item.commentCount} {item.commentCount === 1 ? 'comment' : 'comments'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {item.tripTitle && (
         <View style={styles.feedRelated}>
           <Ionicons name="airplane-outline" size={16} color="#3B82F6" />
@@ -230,26 +333,61 @@ export default function AdventuresScreen() {
           }
         />
       ) : (
-        <FlatList
-          data={feed}
-          renderItem={renderFeedPost}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#3B82F6"
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="newspaper-outline" size={64} color="#6B7280" />
-              <Text style={styles.emptyText}>No posts yet</Text>
-            </View>
-          }
-        />
+        <>
+          <FlatList
+            data={feed}
+            renderItem={renderFeedPost}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#3B82F6"
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="camera-outline" size={64} color="#6B7280" />
+                <Text style={styles.emptyText}>No posts yet</Text>
+                <Text style={styles.emptySubtext}>Share your first photo!</Text>
+              </View>
+            }
+          />
+
+          {/* FAB for creating new post */}
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => setShowCreatePost(true)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#EC4899', '#8B5CF6']}
+              style={styles.fabGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="camera" size={28} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </>
       )}
+
+      <CreatePostModal
+        visible={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+        onPostCreated={handlePostCreated}
+      />
+
+      <CommentsModal
+        visible={showComments}
+        postId={selectedPostId}
+        onClose={() => {
+          setShowComments(false);
+          setSelectedPostId(null);
+        }}
+        onCommentAdded={handleCommentAdded}
+      />
     </View>
   );
 }
@@ -376,28 +514,27 @@ const styles = StyleSheet.create({
   },
   feedCard: {
     backgroundColor: '#1F2937',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
+    borderRadius: 0,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#374151',
   },
   feedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 12,
   },
   feedAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   feedInitial: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
@@ -405,31 +542,90 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   feedName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 2,
   },
   feedTime: {
     fontSize: 12,
     color: '#9CA3AF',
   },
-  feedContent: {
+  feedImage: {
+    width: '100%',
+    aspectRatio: 1,
+  },
+  feedActions: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 16,
+  },
+  actionButton: {
+    padding: 2,
+  },
+  likeCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    paddingHorizontal: 12,
+    marginBottom: 4,
+  },
+  captionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  captionName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginRight: 6,
+  },
+  captionText: {
     fontSize: 14,
     color: '#D1D5DB',
-    lineHeight: 20,
-    marginBottom: 12,
+    flex: 1,
+  },
+  commentCountText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   feedRelated: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   feedRelatedText: {
     fontSize: 14,
     color: '#3B82F6',
     fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
   },
   emptyContainer: {
     alignItems: 'center',

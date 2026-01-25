@@ -11,6 +11,7 @@ import Toast, { toastConfig } from './src/components/Toast';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import VaultScreen from './src/screens/VaultScreen';
+import ChatScreen from './src/screens/ChatScreen';
 import MainNavigator from './src/navigation/MainNavigator';
 
 const Stack = createStackNavigator();
@@ -84,6 +85,13 @@ export default function App() {
                 component={VaultScreen}
                 options={({ route }: any) => ({
                   title: route.params?.tripTitle || 'Vault',
+                })}
+              />
+              <Stack.Screen
+                name="Chat"
+                component={ChatScreen}
+                options={({ route }: any) => ({
+                  title: route.params?.friendName || 'Chat',
                 })}
               />
             </>

@@ -144,6 +144,7 @@ export const tripsAPI = {
 export const eventsAPI = {
   getAll: () => apiRequest('/events'),
   getUpcoming: (limit = 10) => apiRequest(`/events/upcoming?limit=${limit}`),
+  getNearby: (lat, lng, radius = 50) => apiRequest(`/events/nearby?lat=${lat}&lng=${lng}&radius=${radius}`),
   getById: (id) => apiRequest(`/events/${id}`),
   create: (eventData) => apiRequest('/events', {
     method: 'POST',
@@ -184,6 +185,47 @@ export const feedAPI = {
   deletePost: (id) => apiRequest(`/feed/${id}`, {
     method: 'DELETE',
   }),
+  likePost: (postId) => apiRequest(`/feed/${postId}/like`, {
+    method: 'POST',
+  }),
+  unlikePost: (postId) => apiRequest(`/feed/${postId}/like`, {
+    method: 'DELETE',
+  }),
+  getComments: (postId) => apiRequest(`/feed/${postId}/comments`),
+  addComment: (postId, content) => apiRequest(`/feed/${postId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
+};
+
+// Notifications API
+export const notificationsAPI = {
+  getAll: () => apiRequest('/notifications'),
+  getUnreadCount: () => apiRequest('/notifications/unread-count'),
+  markAsRead: (id) => apiRequest(`/notifications/${id}/read`, {
+    method: 'PUT',
+  }),
+  markAllAsRead: () => apiRequest('/notifications/read-all', {
+    method: 'PUT',
+  }),
+};
+
+// Messages API
+export const messagesAPI = {
+  getConversations: () => apiRequest('/conversations'),
+  getOrCreateConversation: (friendId) => apiRequest('/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ friendId }),
+  }),
+  getMessages: (conversationId, limit = 50) => apiRequest(`/conversations/${conversationId}/messages?limit=${limit}`),
+  sendMessage: (conversationId, content) => apiRequest(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
+  markAsRead: (conversationId) => apiRequest(`/conversations/${conversationId}/read`, {
+    method: 'PUT',
+  }),
+  getUnreadCount: () => apiRequest('/conversations/unread-count'),
 };
 
 // Adventures API

@@ -14,10 +14,12 @@ const Event = require('./models/Event');
 const Vault = require('./models/Vault');
 const Feed = require('./models/Feed');
 const Adventure = require('./models/Adventure');
+const Message = require('./models/Message');
 
 // Import services
 const AIService = require('./services/aiService');
 const StripeService = require('./services/stripeService');
+const NotificationService = require('./services/notificationService');
 const Payment = require('./models/Payment');
 
 const app = express();
@@ -298,6 +300,14 @@ app.put('/api/trips/:id', authenticateToken, (req, res) => {
 // Delete trip
 app.delete('/api/trips/:id', authenticateToken, (req, res) => {
   try {
+    // Check if user is the trip creator
+    const trip = Trip.findById(req.params.id);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.createdBy !== req.user.id) {
+      return res.status(403).json({ error: 'Only the trip creator can delete this trip' });
+    }
     Trip.delete(req.params.id);
     res.json({ message: 'Trip deleted successfully' });
   } catch (error) {
@@ -367,6 +377,30 @@ app.get('/api/events/upcoming', (req, res) => {
   try {
     const limit = req.query.limit || 10;
     const events = Event.getUpcoming(limit);
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get nearby events based on user location
+app.get('/api/events/nearby', authenticateToken, (req, res) => {
+  try {
+    const { lat, lng, radius } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ error: 'Latitude and longitude are required' });
+    }
+
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+    const radiusKm = parseFloat(radius) || 50;
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({ error: 'Invalid latitude or longitude' });
+    }
+
+    const events = Event.getNearbySimple(latitude, longitude, radiusKm, 20);
     res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -507,6 +541,67 @@ app.delete('/api/feed/:id', authenticateToken, (req, res) => {
   try {
     Feed.delete(req.params.id);
     res.json({ message: 'Post deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Like a post
+app.post('/api/feed/:id/like', authenticateToken, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const likeCount = Feed.likePost(postId, req.user.id);
+    res.json({ success: true, likeCount, isLiked: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Unlike a post
+app.delete('/api/feed/:id/like', authenticateToken, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const likeCount = Feed.unlikePost(postId, req.user.id);
+    res.json({ success: true, likeCount, isLiked: false });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get comments for a post
+app.get('/api/feed/:id/comments', authenticateToken, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const comments = Feed.getComments(postId);
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add comment to a post
+app.post('/api/feed/:id/comments', authenticateToken, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    const comment = Feed.addComment(postId, req.user.id, content.trim());
+    res.status(201).json(comment);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a comment
+app.delete('/api/feed/comments/:id', authenticateToken, (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id);
+    Feed.deleteComment(commentId, req.user.id);
+    res.json({ message: 'Comment deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -812,6 +907,192 @@ app.get('/api/users/search', authenticateToken, (req, res) => {
     );
 
     res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== NOTIFICATION ROUTES ====================
+
+// Save push token
+app.post('/api/push-token', authenticateToken, (req, res) => {
+  try {
+    const { token, platform } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Push token is required' });
+    }
+
+    NotificationService.savePushToken(req.user.id, token, platform || 'expo');
+    res.json({ success: true, message: 'Push token saved' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove push token (on logout)
+app.delete('/api/push-token', authenticateToken, (req, res) => {
+  try {
+    NotificationService.removePushToken(req.user.id);
+    res.json({ success: true, message: 'Push token removed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user's notifications
+app.get('/api/notifications', authenticateToken, (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const notifications = NotificationService.getUserNotifications(req.user.id, limit);
+    const unreadCount = NotificationService.getUnreadCount(req.user.id);
+    res.json({ notifications, unreadCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get unread notification count
+app.get('/api/notifications/unread-count', authenticateToken, (req, res) => {
+  try {
+    const count = NotificationService.getUnreadCount(req.user.id);
+    res.json({ unreadCount: count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark notification as read
+app.put('/api/notifications/:id/read', authenticateToken, (req, res) => {
+  try {
+    NotificationService.markAsRead(parseInt(req.params.id), req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark all notifications as read
+app.put('/api/notifications/read-all', authenticateToken, (req, res) => {
+  try {
+    NotificationService.markAllAsRead(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== MESSAGING ROUTES ====================
+
+// Get all conversations for current user
+app.get('/api/conversations', authenticateToken, (req, res) => {
+  try {
+    const conversations = Message.getUserConversations(req.user.id);
+    res.json(conversations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get or create conversation with a user
+app.post('/api/conversations', authenticateToken, (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot create conversation with yourself' });
+    }
+
+    // Verify they are friends
+    const friends = Friend.getFriends(req.user.id);
+    const isFriend = friends.some(f => f.id === userId);
+    if (!isFriend) {
+      return res.status(400).json({ error: 'Can only message friends' });
+    }
+
+    const conversation = Message.getOrCreateConversation(req.user.id, userId);
+    res.json(conversation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get messages in a conversation
+app.get('/api/conversations/:id/messages', authenticateToken, (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id);
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Verify user is part of this conversation
+    const conv = Message.getConversationById(conversationId);
+    if (!conv || (conv.user1Id !== req.user.id && conv.user2Id !== req.user.id)) {
+      return res.status(403).json({ error: 'Not authorized to view this conversation' });
+    }
+
+    const messages = Message.getConversationMessages(conversationId, limit, offset);
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send message in a conversation
+app.post('/api/conversations/:id/messages', authenticateToken, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id);
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    // Verify user is part of this conversation
+    const conv = Message.getConversationById(conversationId);
+    if (!conv || (conv.user1Id !== req.user.id && conv.user2Id !== req.user.id)) {
+      return res.status(403).json({ error: 'Not authorized to send message in this conversation' });
+    }
+
+    const message = Message.sendMessage(conversationId, req.user.id, content.trim());
+
+    // Send push notification to recipient
+    const recipientId = conv.user1Id === req.user.id ? conv.user2Id : conv.user1Id;
+    const sender = User.findById(req.user.id);
+    NotificationService.sendMessageNotification(recipientId, sender.name, content.trim(), conversationId);
+
+    res.status(201).json(message);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark conversation as read
+app.put('/api/conversations/:id/read', authenticateToken, (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id);
+
+    // Verify user is part of this conversation
+    const conv = Message.getConversationById(conversationId);
+    if (!conv || (conv.user1Id !== req.user.id && conv.user2Id !== req.user.id)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    Message.markConversationAsRead(conversationId, req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get total unread message count
+app.get('/api/messages/unread-count', authenticateToken, (req, res) => {
+  try {
+    const count = Message.getUnreadCount(req.user.id);
+    res.json({ unreadCount: count });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

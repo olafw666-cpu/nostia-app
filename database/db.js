@@ -125,12 +125,39 @@ function initializeDatabase() {
       userId INTEGER NOT NULL,
       content TEXT NOT NULL,
       type TEXT DEFAULT 'text',
+      imageData TEXT,
       relatedTripId INTEGER,
       relatedEventId INTEGER,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (relatedTripId) REFERENCES trips(id) ON DELETE SET NULL,
       FOREIGN KEY (relatedEventId) REFERENCES events(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Post likes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS post_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      postId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (postId) REFERENCES feed_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(postId, userId)
+    )
+  `);
+
+  // Post comments table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS post_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      postId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (postId) REFERENCES feed_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
@@ -231,6 +258,19 @@ function initializeDatabase() {
     // Column already exists
   }
 
+  // Add latitude/longitude to events for location-based discovery
+  try {
+    db.exec(`ALTER TABLE events ADD COLUMN latitude REAL`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE events ADD COLUMN longitude REAL`);
+  } catch (e) {
+    // Column already exists
+  }
+
   // Add Stripe-related columns to vault_splits if they don't exist
   try {
     db.exec(`ALTER TABLE vault_splits ADD COLUMN stripePayable BOOLEAN DEFAULT 1`);
@@ -249,6 +289,76 @@ function initializeDatabase() {
   } catch (e) {
     // Column already exists
   }
+
+  // Add imageData column to feed_posts if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE feed_posts ADD COLUMN imageData TEXT`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Push tokens table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER UNIQUE NOT NULL,
+      token TEXT NOT NULL,
+      platform TEXT,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Notifications table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      data TEXT,
+      read BOOLEAN DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Add index for faster notification lookups
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(userId)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(userId, read)`);
+
+  // Conversations table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user1Id INTEGER NOT NULL,
+      user2Id INTEGER NOT NULL,
+      lastMessageAt DATETIME,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user1Id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (user2Id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user1Id, user2Id)
+    )
+  `);
+
+  // Messages table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversationId INTEGER NOT NULL,
+      senderId INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      read BOOLEAN DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (senderId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Add indexes for faster message lookups
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_users ON conversations(user1Id, user2Id)`);
 
   console.log('✅ Database tables initialized successfully');
 }

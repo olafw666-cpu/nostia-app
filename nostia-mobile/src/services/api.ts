@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // Set to localhost - user must update to their local IP for physical device testing
-const API_BASE_URL = 'http://10.174.176.162:3000/api';
+const API_BASE_URL = 'http://10.174.177.226:3000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -197,13 +197,38 @@ export const feedAPI = {
     return response.data;
   },
 
-  createPost: async (postData: any) => {
+  createPost: async (postData: { content?: string; imageData?: string; relatedTripId?: number; relatedEventId?: number }) => {
     const response = await api.post('/feed', postData);
     return response.data;
   },
 
   deletePost: async (id: number) => {
     const response = await api.delete(`/feed/${id}`);
+    return response.data;
+  },
+
+  likePost: async (id: number) => {
+    const response = await api.post(`/feed/${id}/like`);
+    return response.data;
+  },
+
+  unlikePost: async (id: number) => {
+    const response = await api.delete(`/feed/${id}/like`);
+    return response.data;
+  },
+
+  getComments: async (postId: number) => {
+    const response = await api.get(`/feed/${postId}/comments`);
+    return response.data;
+  },
+
+  addComment: async (postId: number, content: string) => {
+    const response = await api.post(`/feed/${postId}/comments`, { content });
+    return response.data;
+  },
+
+  deleteComment: async (commentId: number) => {
+    const response = await api.delete(`/feed/comments/${commentId}`);
     return response.data;
   },
 };
@@ -243,6 +268,11 @@ export const eventsAPI = {
     return response.data;
   },
 
+  getNearby: async (lat: number, lng: number, radiusKm: number = 50) => {
+    const response = await api.get(`/events/nearby?lat=${lat}&lng=${lng}&radius=${radiusKm}`);
+    return response.data;
+  },
+
   getById: async (id: number) => {
     const response = await api.get(`/events/${id}`);
     return response.data;
@@ -268,6 +298,77 @@ export const eventsAPI = {
 export const aiAPI = {
   generate: async (task: string, input: any) => {
     const response = await api.post('/ai/generate', { task, input });
+    return response.data;
+  },
+
+  chat: async (message: string, context: any = {}) => {
+    const response = await api.post('/ai/chat', { message, context });
+    return response.data;
+  },
+};
+
+// ===== Notifications API =====
+export const notificationsAPI = {
+  getAll: async (limit: number = 50) => {
+    const response = await api.get(`/notifications?limit=${limit}`);
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data;
+  },
+
+  markAsRead: async (notificationId: number) => {
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await api.put('/notifications/read-all');
+    return response.data;
+  },
+
+  savePushToken: async (token: string, platform: string) => {
+    const response = await api.post('/push-token', { token, platform });
+    return response.data;
+  },
+
+  removePushToken: async () => {
+    const response = await api.delete('/push-token');
+    return response.data;
+  },
+};
+
+// ===== Messaging API =====
+export const messagesAPI = {
+  getConversations: async () => {
+    const response = await api.get('/conversations');
+    return response.data;
+  },
+
+  getOrCreateConversation: async (userId: number) => {
+    const response = await api.post('/conversations', { userId });
+    return response.data;
+  },
+
+  getMessages: async (conversationId: number, limit: number = 50, offset: number = 0) => {
+    const response = await api.get(`/conversations/${conversationId}/messages?limit=${limit}&offset=${offset}`);
+    return response.data;
+  },
+
+  sendMessage: async (conversationId: number, content: string) => {
+    const response = await api.post(`/conversations/${conversationId}/messages`, { content });
+    return response.data;
+  },
+
+  markAsRead: async (conversationId: number) => {
+    const response = await api.put(`/conversations/${conversationId}/read`);
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/messages/unread-count');
     return response.data;
   },
 };
