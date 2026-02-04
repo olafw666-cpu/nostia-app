@@ -1,8 +1,11 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { Alert } from 'react-native';
 
-// Set to localhost - user must update to their local IP for physical device testing
-const API_BASE_URL = 'http://10.174.177.226:3000/api';
+// Use environment config if available, fallback to local IP for development
+const API_BASE_URL =
+  Constants.expoConfig?.extra?.apiUrl || 'http://10.174.177.226:3000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,6 +23,28 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Response interceptor for rate limiting and consent-required
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 429) {
+      Alert.alert(
+        'Too Many Requests',
+        'Please wait a moment and try again.'
+      );
+    }
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.consentRequired
+    ) {
+      // Emit a global event so navigation can redirect to consent screen
+      const { DeviceEventEmitter } = require('react-native');
+      DeviceEventEmitter.emit('consent-required', error.response.data);
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ===== Authentication API =====
 export const authAPI = {
   login: async (username: string, password: string) => {
@@ -30,8 +55,22 @@ export const authAPI = {
     return response.data;
   },
 
-  register: async (username: string, password: string, name: string, email?: string) => {
-    const response = await api.post('/auth/register', { username, password, name, email });
+  register: async (
+    username: string,
+    password: string,
+    name: string,
+    email?: string,
+    locationConsent?: boolean,
+    dataCollectionConsent?: boolean
+  ) => {
+    const response = await api.post('/auth/register', {
+      username,
+      password,
+      name,
+      email,
+      locationConsent,
+      dataCollectionConsent,
+    });
     if (response.data.token) {
       await SecureStore.setItemAsync('jwt_token', response.data.token);
     }
@@ -369,6 +408,136 @@ export const messagesAPI = {
 
   getUnreadCount: async () => {
     const response = await api.get('/messages/unread-count');
+    return response.data;
+  },
+};
+
+// ===== Consent API =====
+export const consentAPI = {
+  grant: async (consentData: { locationConsent: boolean; dataCollectionConsent: boolean }) => {
+    const response = await api.post('/consent', consentData);
+    return response.data;
+  },
+
+  getStatus: async () => {
+    const response = await api.get('/consent');
+    return response.data;
+  },
+
+  revoke: async () => {
+    const response = await api.post('/consent/revoke');
+    return response.data;
+  },
+
+  getHistory: async () => {
+    const response = await api.get('/consent/history');
+    return response.data;
+  },
+
+  getCurrentVersion: async () => {
+    const response = await api.get('/consent/current-version');
+    return response.data;
+  },
+};
+
+// ===== Analytics API =====
+export const analyticsAPI = {
+  track: async (eventData: {
+    eventType: string;
+    eventName: string;
+    latitude?: number;
+    longitude?: number;
+    metadata?: string;
+  }) => {
+    const response = await api.post('/analytics/track', eventData);
+    return response.data;
+  },
+
+  trackBatch: async (events: any[]) => {
+    const response = await api.post('/analytics/track-batch', { events });
+    return response.data;
+  },
+
+  startSession: async (platform: string = 'mobile') => {
+    const response = await api.post('/analytics/session/start', { platform });
+    return response.data;
+  },
+
+  endSession: async (sessionId: number) => {
+    const response = await api.post('/analytics/session/end', { sessionId });
+    return response.data;
+  },
+
+  getDashboard: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/dashboard', { params });
+    return response.data;
+  },
+
+  getHeatmap: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/heatmap', { params });
+    return response.data;
+  },
+
+  getFeatureUsage: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/feature-usage', { params });
+    return response.data;
+  },
+
+  getRetention: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/retention', { params });
+    return response.data;
+  },
+
+  getFunnels: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/funnels', { params });
+    return response.data;
+  },
+
+  getSessions: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/analytics/sessions', { params });
+    return response.data;
+  },
+
+  getSubscription: async () => {
+    const response = await api.get('/analytics/subscription');
+    return response.data;
+  },
+
+  subscribe: async (plan: string) => {
+    const response = await api.post('/analytics/subscribe', { plan });
+    return response.data;
+  },
+
+  cancelSubscription: async () => {
+    const response = await api.post('/analytics/subscription/cancel');
+    return response.data;
+  },
+
+  purchaseReport: async (reportData: { reportType: string; startDate: string; endDate: string }) => {
+    const response = await api.post('/analytics/reports/purchase', reportData);
+    return response.data;
+  },
+};
+
+// ===== Privacy API =====
+export const privacyAPI = {
+  getPolicy: async () => {
+    const response = await api.get('/privacy/policy');
+    return response.data;
+  },
+
+  requestDataExport: async () => {
+    const response = await api.post('/privacy/data-request');
+    return response.data;
+  },
+
+  downloadExport: async (exportId: number) => {
+    const response = await api.get(`/privacy/data-export/${exportId}`);
+    return response.data;
+  },
+
+  requestDataDeletion: async () => {
+    const response = await api.post('/privacy/delete-data');
     return response.data;
   },
 };

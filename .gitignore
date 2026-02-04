@@ -11,6 +11,7 @@ lerna-debug.log*
 database/*.db
 database/*.db-shm
 database/*.db-wal
+database/backups/
 *.sqlite
 *.sqlite3
 

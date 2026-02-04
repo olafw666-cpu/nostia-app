@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:3000/api';
+// Use HTTPS in production, fallback to localhost for development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Get auth token from localStorage
 const getToken = () => localStorage.getItem('token');
@@ -40,6 +41,14 @@ const apiRequest = async (endpoint, options = {}) => {
 
   if (!response.ok) {
     const error = await response.json();
+    // Handle rate limiting
+    if (response.status === 429) {
+      throw new Error('Too many requests. Please wait a moment and try again.');
+    }
+    // Detect consent-required response and notify the app
+    if (response.status === 403 && error.consentRequired) {
+      window.dispatchEvent(new CustomEvent('consent-required', { detail: error }));
+    }
     throw new Error(error.error || 'An error occurred');
   }
 
@@ -58,10 +67,10 @@ export const authAPI = {
     return data;
   },
 
-  register: async (username, password, name, email) => {
+  register: async (username, password, name, email, locationConsent = true, dataCollectionConsent = true) => {
     const data = await apiRequest('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, name, email }),
+      body: JSON.stringify({ username, password, name, email, locationConsent, dataCollectionConsent }),
     });
     setToken(data.token);
     setCurrentUser(data.user);
@@ -272,6 +281,64 @@ export const paymentsAPI = {
   deletePaymentMethod: (methodId) => apiRequest(`/payment-methods/${methodId}`, {
     method: 'DELETE',
   }),
+};
+
+// Consent API
+export const consentAPI = {
+  grant: (consentData) => apiRequest('/consent', {
+    method: 'POST',
+    body: JSON.stringify(consentData),
+  }),
+  getStatus: () => apiRequest('/consent'),
+  revoke: () => apiRequest('/consent/revoke', { method: 'POST' }),
+  getHistory: () => apiRequest('/consent/history'),
+  getCurrentVersion: () => apiRequest('/consent/current-version'),
+};
+
+// Analytics API
+export const analyticsAPI = {
+  track: (eventData) => apiRequest('/analytics/track', {
+    method: 'POST',
+    body: JSON.stringify(eventData),
+  }).catch(() => {}), // Fire-and-forget
+  trackBatch: (events) => apiRequest('/analytics/track-batch', {
+    method: 'POST',
+    body: JSON.stringify({ events }),
+  }).catch(() => {}),
+  startSession: (sessionData) => apiRequest('/analytics/session/start', {
+    method: 'POST',
+    body: JSON.stringify(sessionData),
+  }).catch(() => {}),
+  endSession: (sessionId) => apiRequest('/analytics/session/end', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId }),
+  }).catch(() => {}),
+  getDashboard: (params = {}) => apiRequest(`/analytics/dashboard?${new URLSearchParams(params)}`),
+  getHeatmap: (params = {}) => apiRequest(`/analytics/heatmap?${new URLSearchParams(params)}`),
+  getFeatureUsage: (params = {}) => apiRequest(`/analytics/feature-usage?${new URLSearchParams(params)}`),
+  getRetention: (params = {}) => apiRequest(`/analytics/retention?${new URLSearchParams(params)}`),
+  getFunnels: (params = {}) => apiRequest(`/analytics/funnels?${new URLSearchParams(params)}`),
+  getSessions: (params = {}) => apiRequest(`/analytics/sessions?${new URLSearchParams(params)}`),
+  getRegional: (params = {}) => apiRequest(`/analytics/regional?${new URLSearchParams(params)}`),
+  subscribe: (plan) => apiRequest('/analytics/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
+  }),
+  getSubscription: () => apiRequest('/analytics/subscription'),
+  cancelSubscription: () => apiRequest('/analytics/subscription/cancel', { method: 'POST' }),
+  purchaseReport: (reportParams) => apiRequest('/analytics/reports/purchase', {
+    method: 'POST',
+    body: JSON.stringify(reportParams),
+  }),
+  downloadReport: (reportId) => apiRequest(`/analytics/reports/download/${reportId}`),
+};
+
+// Privacy API
+export const privacyAPI = {
+  getPolicy: () => apiRequest('/privacy/policy'),
+  requestDataExport: () => apiRequest('/privacy/data-request', { method: 'POST' }),
+  requestDataDeletion: () => apiRequest('/privacy/delete-data', { method: 'POST' }),
+  downloadExport: (requestId) => apiRequest(`/privacy/data-export/${requestId}`),
 };
 
 // Export utilities

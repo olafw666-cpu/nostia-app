@@ -12,7 +12,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { tripsAPI } from '../services/api';
+import { tripsAPI, analyticsAPI } from '../services/api';
 import CreateTripModal from '../components/CreateTripModal';
 import AIChatModal from '../components/AIChatModal';
 
@@ -50,9 +50,18 @@ export default function TripsScreen() {
   const handleTripCreated = () => {
     setShowCreateModal(false);
     loadTrips();
+    analyticsAPI.track({
+      eventType: 'action',
+      eventName: 'trip_created',
+    }).catch(() => {});
   };
 
   const handleViewVault = (trip: any) => {
+    analyticsAPI.track({
+      eventType: 'action',
+      eventName: 'vault_opened',
+      metadata: JSON.stringify({ tripId: trip.id }),
+    }).catch(() => {});
     // Navigate to VaultScreen with trip ID
     (navigation as any).navigate('Vault', { tripId: trip.id, tripTitle: trip.title });
   };

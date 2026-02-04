@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { authAPI } from '../services/api';
+import ConsentModal from '../components/ConsentModal';
 
 export default function SignupScreen() {
   const [username, setUsername] = useState('');
@@ -22,18 +23,59 @@ export default function SignupScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
+  const [consentData, setConsentData] = useState<{
+    locationConsent: boolean;
+    dataCollectionConsent: boolean;
+  } | null>(null);
   const navigation = useNavigation();
 
+  const validateInputs = (): string | null => {
+    const trimmedUsername = username.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedName || trimmedName.length > 100) {
+      return 'Name is required (max 100 characters)';
+    }
+    if (!trimmedUsername || trimmedUsername.length < 3 || trimmedUsername.length > 30) {
+      return 'Username must be 3-30 characters';
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      return 'Username can only contain letters, numbers, and underscores';
+    }
+    if (!password || password.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  };
+
   const handleSignup = async () => {
-    if (!username || !password || !name) {
-      Alert.alert('Missing Information', 'Please fill in username, password, and name');
+    const validationError = validateInputs();
+    if (validationError) {
+      Alert.alert('Invalid Input', validationError);
+      return;
+    }
+
+    // Show consent modal if not yet consented
+    if (!consentData) {
+      setShowConsent(true);
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await authAPI.register(username, password, name, email);
+      const response = await authAPI.register(
+        username,
+        password,
+        name,
+        email,
+        consentData.locationConsent,
+        consentData.dataCollectionConsent
+      );
 
       Alert.alert('Success!', `Welcome to Nostia, ${name}!`, [
         { text: 'OK', onPress: () => (navigation as any).replace('Main') },
@@ -49,6 +91,50 @@ export default function SignupScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConsent = (consent: { locationConsent: boolean; dataCollectionConsent: boolean }) => {
+    setConsentData(consent);
+    setShowConsent(false);
+    // Auto-submit after consent is granted
+    setTimeout(() => handleSignupWithConsent(consent), 100);
+  };
+
+  const handleSignupWithConsent = async (consent: { locationConsent: boolean; dataCollectionConsent: boolean }) => {
+    if (validateInputs()) return;
+
+    setLoading(true);
+    try {
+      const response = await authAPI.register(
+        username,
+        password,
+        name,
+        email,
+        consent.locationConsent,
+        consent.dataCollectionConsent
+      );
+
+      Alert.alert('Success!', `Welcome to Nostia, ${name}!`, [
+        { text: 'OK', onPress: () => (navigation as any).replace('Main') },
+      ]);
+    } catch (error: any) {
+      console.log('Signup error:', error.response?.data || error.message);
+      if (error.response?.status === 400) {
+        Alert.alert('Signup Failed', error.response.data.error || 'Username already exists');
+      } else {
+        Alert.alert('Signup Failed', 'An error occurred. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeclineConsent = () => {
+    setShowConsent(false);
+    Alert.alert(
+      'Consent Required',
+      'You must agree to the location and data collection terms to create an account on Nostia.'
+    );
   };
 
   return (
@@ -83,6 +169,7 @@ export default function SignupScreen() {
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
+              maxLength={100}
             />
           </View>
 
@@ -95,6 +182,8 @@ export default function SignupScreen() {
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={30}
             />
           </View>
 
@@ -124,6 +213,13 @@ export default function SignupScreen() {
             />
           </View>
 
+          {consentData && (
+            <View style={styles.consentGrantedBadge}>
+              <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+              <Text style={styles.consentGrantedText}>Consent granted</Text>
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.signupButtonContainer}
             onPress={handleSignup}
@@ -140,8 +236,10 @@ export default function SignupScreen() {
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Ionicons name="person-add" size={20} color="#FFFFFF" />
-                  <Text style={styles.signupButtonText}>Create Account</Text>
+                  <Ionicons name={consentData ? "person-add" : "shield-checkmark"} size={20} color="#FFFFFF" />
+                  <Text style={styles.signupButtonText}>
+                    {consentData ? 'Create Account' : 'Continue to Consent'}
+                  </Text>
                 </>
               )}
             </LinearGradient>
@@ -163,6 +261,12 @@ export default function SignupScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ConsentModal
+        visible={showConsent}
+        onConsent={handleConsent}
+        onDecline={handleDeclineConsent}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -255,5 +359,19 @@ const styles = StyleSheet.create({
   loginLinkBold: {
     fontWeight: 'bold',
     color: '#3B82F6',
+  },
+  consentGrantedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#064E3B',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  consentGrantedText: {
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '600',
   },
 });

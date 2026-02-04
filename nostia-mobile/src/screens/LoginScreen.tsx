@@ -23,7 +23,8 @@ export default function LoginScreen() {
   const navigation = useNavigation();
 
   const handleLogin = async () => {
-    if (!username || !password) {
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password) {
       Alert.alert('Missing Information', 'Please enter your username and password');
       return;
     }
@@ -31,7 +32,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login(username.trim(), password);
+      const response = await authAPI.login(trimmedUsername, password);
 
       Alert.alert('Welcome Back!', `Hello, ${response.user?.name || username}!`, [
         { text: 'OK', onPress: () => (navigation as any).replace('Main') },
@@ -39,7 +40,9 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.log('Login error:', error.response?.data || error.message);
 
-      if (error.response?.status === 401) {
+      if (error.response?.status === 429) {
+        // Already handled by interceptor
+      } else if (error.response?.status === 401) {
         Alert.alert('Login Failed', 'Invalid username or password');
       } else if (error.response?.status === 404) {
         Alert.alert('Login Failed', 'User not found');
