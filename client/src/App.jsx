@@ -23,7 +23,9 @@ import {
   Heart,
   MessageCircle,
   Send,
-  Image
+  Image,
+  Settings,
+  BarChart2
 } from "lucide-react";
 import {
   authAPI,
@@ -36,6 +38,8 @@ import {
   aiAPI,
   notificationsAPI,
   messagesAPI,
+  analyticsAPI,
+  consentAPI,
   getToken,
   getCurrentUser,
 } from "./api";
@@ -45,6 +49,9 @@ import { SkeletonCard } from "./components/SkeletonLoader";
 import EmptyState from "./components/EmptyState";
 import PaymentModal from "./components/PaymentModal";
 import AIChatModal from "./components/AIChatModal";
+import ConsentModal from "./components/ConsentModal";
+import AnalyticsDashboard from "./components/AnalyticsDashboard";
+import PrivacySettings from "./components/PrivacySettings";
 import { buttonPress, slideIn, fadeIn } from "./utils/animations";
 
 function App() {
@@ -99,6 +106,22 @@ function App() {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyEvents, setNearbyEvents] = useState([]);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const [sessionId] = useState(() => crypto.randomUUID());
+
+  // Helper to track analytics events (fire-and-forget)
+  const trackEvent = (eventName, eventType = 'feature_click', extra = {}) => {
+    analyticsAPI.track({
+      sessionId,
+      eventType,
+      eventName,
+      eventData: extra,
+      latitude: userLocation?.latitude,
+      longitude: userLocation?.longitude,
+    });
+  };
 
   // Check authentication on mount
   useEffect(() => {
@@ -109,9 +132,24 @@ function App() {
       setUser(savedUser);
       loadData();
       requestLocation();
+      // Start analytics session
+      analyticsAPI.startSession({ sessionId, platform: 'web' });
     } else {
       setShowAuthModal(true);
     }
+
+    // Listen for consent-required events from API layer
+    const handleConsentRequired = () => setShowConsentModal(true);
+    window.addEventListener('consent-required', handleConsentRequired);
+
+    // End session on unload
+    const handleUnload = () => analyticsAPI.endSession(sessionId);
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      window.removeEventListener('consent-required', handleConsentRequired);
+      window.removeEventListener('beforeunload', handleUnload);
+    };
   }, []);
 
   // Request user location
@@ -172,8 +210,13 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const username = formData.get('username');
-    const password = formData.get('password');
+    const username = formData.get('username')?.toString().trim();
+    const password = formData.get('password')?.toString();
+
+    if (!username || !password) {
+      toast.error('Please enter username and password');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -194,20 +237,53 @@ function App() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    // Check if consent has been granted
+    if (!consentGranted) {
+      // Store the form event and show consent modal
+      setShowConsentModal(true);
+      return;
+    }
+
     const formData = new FormData(e.target);
-    const username = formData.get('username');
-    const password = formData.get('password');
-    const name = formData.get('name');
-    const email = formData.get('email');
+    const username = formData.get('username')?.toString().trim();
+    const password = formData.get('password')?.toString();
+    const name = formData.get('name')?.toString().trim();
+    const email = formData.get('email')?.toString().trim();
+
+    // Client-side validation matching server rules
+    if (!username || username.length < 3 || username.length > 30) {
+      toast.error('Username must be 3-30 characters');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      toast.error('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+    if (!password || password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (!name || name.length > 100) {
+      toast.error('Name is required (max 100 characters)');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
-      const data = await authAPI.register(username, password, name, email);
+      const data = await authAPI.register(username, password, name, email, true, true);
       setUser(data.user);
       setIsAuthenticated(true);
       setShowAuthModal(false);
+      setConsentGranted(false);
       toast.success(`Account created! Welcome, ${data.user.name}!`);
+      // Start analytics session
+      analyticsAPI.startSession({ sessionId, platform: 'web' });
       await loadData();
     } catch (err) {
       toast.error(err.message);
@@ -258,6 +334,7 @@ function App() {
       setShowCreateTripModal(false);
       e.target.reset();
       toast.success('Trip created successfully!');
+      trackEvent('trip_created', 'conversion', { tripId: newTrip.id });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -295,6 +372,7 @@ function App() {
     try {
       await friendsAPI.acceptRequest(requestId);
       toast.success('Friend request accepted!');
+      trackEvent('friend_added', 'conversion');
       await loadData(); // Reload friends and requests
     } catch (err) {
       toast.error(err.message);
@@ -313,6 +391,7 @@ function App() {
 
   const handleOpenVault = async (trip) => {
     try {
+      trackEvent('vault_opened', 'feature_click', { tripId: trip.id });
       setSelectedTrip(trip);
       setVaultData(null); // Reset vault data
       setShowVaultModal(true); // Show modal immediately with loading state
@@ -345,6 +424,7 @@ function App() {
       toast.success(`Friend request sent to @${username}!`);
       setSearchResults([]);
       setFriendSearchQuery('');
+      trackEvent('friend_request_sent', 'conversion');
     } catch (err) {
       toast.error(err.message);
     }
@@ -444,6 +524,7 @@ function App() {
     toast.success('Payment completed!');
     setShowPaymentModal(false);
     setSelectedSplit(null);
+    trackEvent('payment_completed', 'conversion');
 
     // Reload vault data
     const data = await vaultAPI.getTripSummary(selectedTrip.id);
@@ -1147,6 +1228,8 @@ function App() {
     if (currentView === "discover") return <DiscoverView />;
     if (currentView === "friends") return <FriendsView />;
     if (currentView === "notifications") return <NotificationsView />;
+    if (currentView === "analytics") return <AnalyticsDashboard />;
+    if (currentView === "privacy") return <PrivacySettings onClose={() => setCurrentView("home")} />;
     return <HomeView />;
   };
 
@@ -1162,6 +1245,12 @@ function App() {
         {error && (
           <div className="bg-red-900 text-red-200 p-3 rounded mb-4 text-sm">
             {error}
+          </div>
+        )}
+
+        {authMode === 'register' && consentGranted && (
+          <div className="bg-green-900/30 border border-green-700 text-green-300 p-3 rounded mb-4 text-xs">
+            Consent granted. Fill in your details to create your account.
           </div>
         )}
 
@@ -1203,7 +1292,7 @@ function App() {
             disabled={loading}
             className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:bg-gray-600"
           >
-            {loading ? 'Please wait...' : (authMode === 'login' ? 'Login' : 'Register')}
+            {loading ? 'Please wait...' : (authMode === 'login' ? 'Login' : (consentGranted ? 'Register' : 'Continue to Consent'))}
           </button>
         </form>
 
@@ -1211,6 +1300,7 @@ function App() {
           onClick={() => {
             setAuthMode(authMode === 'login' ? 'register' : 'login');
             setError(null);
+            setConsentGranted(false);
           }}
           className="w-full mt-3 text-blue-400 text-sm hover:underline"
         >
@@ -1859,6 +1949,14 @@ function App() {
                 <Bell size={18} />
               </motion.button>
               <motion.button
+                onClick={() => setCurrentView("privacy")}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className={currentView === "privacy" ? "text-blue-400" : ""}
+              >
+                <Settings size={18} />
+              </motion.button>
+              <motion.button
                 onClick={handleLogout}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
@@ -1909,6 +2007,16 @@ function App() {
               <Users size={20} className="mx-auto" />
               Friends
             </motion.button>
+            {user?.role === 'admin' && (
+              <motion.button
+                onClick={() => setCurrentView("analytics")}
+                className={currentView === "analytics" ? "text-blue-400" : "text-gray-500"}
+                whileTap={{ scale: 0.95 }}
+              >
+                <BarChart2 size={20} className="mx-auto" />
+                Analytics
+              </motion.button>
+            )}
             <motion.button
               onClick={() => setCurrentView("notifications")}
               className={`relative ${currentView === "notifications" ? "text-blue-400" : "text-gray-500"}`}
@@ -2137,6 +2245,28 @@ function App() {
             console.log('Generated itinerary:', itinerary);
           }}
         />
+
+        {/* Consent Modal (shown during registration or when consent is required) */}
+        {showConsentModal && (
+          <ConsentModal
+            onConsent={({ locationConsent, dataCollectionConsent }) => {
+              setConsentGranted(true);
+              setShowConsentModal(false);
+              // If user is already authenticated, re-grant consent
+              if (isAuthenticated) {
+                consentAPI.grant({ locationConsent, dataCollectionConsent })
+                  .then(() => toast.success('Consent granted'))
+                  .catch((err) => toast.error(err.message));
+              }
+            }}
+            onDecline={() => {
+              setShowConsentModal(false);
+              if (!isAuthenticated) {
+                toast.error('Location and data consent are required to create an account');
+              }
+            }}
+          />
+        )}
 
         {/* Floating AI Assistant Button */}
         {isAuthenticated && !showAIChat && (

@@ -9,19 +9,32 @@ import TripsScreen from '../screens/TripsScreen';
 import AdventuresScreen from '../screens/AdventuresScreen';
 import FriendsScreen from '../screens/FriendsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
-import { notificationsAPI } from '../services/api';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
+import PrivacyScreen from '../screens/PrivacyScreen';
+import { notificationsAPI, authAPI } from '../services/api';
 
 const Tab = createBottomTabNavigator();
 
 export default function MainNavigator() {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userRole, setUserRole] = useState<string>('user');
 
   useEffect(() => {
     loadUnreadCount();
+    loadUserRole();
     // Poll for unread count every 30 seconds
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadUserRole = async () => {
+    try {
+      const user = await authAPI.getMe();
+      setUserRole(user.role || 'user');
+    } catch (error) {
+      // Silently fail
+    }
+  };
 
   const loadUnreadCount = async () => {
     try {
@@ -48,6 +61,10 @@ export default function MainNavigator() {
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'NotificationsTab') {
             iconName = focused ? 'notifications' : 'notifications-outline';
+          } else if (route.name === 'AnalyticsTab') {
+            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+          } else if (route.name === 'PrivacyTab') {
+            iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
           } else {
             iconName = 'help-outline';
           }
@@ -129,6 +146,18 @@ export default function MainNavigator() {
             setTimeout(loadUnreadCount, 500);
           },
         }}
+      />
+      {userRole === 'admin' && (
+        <Tab.Screen
+          name="AnalyticsTab"
+          component={AnalyticsScreen}
+          options={{ title: 'Analytics', headerTitle: 'Analytics Dashboard' }}
+        />
+      )}
+      <Tab.Screen
+        name="PrivacyTab"
+        component={PrivacyScreen}
+        options={{ title: 'Privacy', headerTitle: 'Privacy & Settings' }}
       />
     </Tab.Navigator>
   );

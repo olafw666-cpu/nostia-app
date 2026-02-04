@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { authAPI, tripsAPI, eventsAPI, friendsAPI } from '../services/api';
+import { authAPI, tripsAPI, eventsAPI, friendsAPI, analyticsAPI } from '../services/api';
 import { getCurrentLocation, requestLocationPermission, LocationData } from '../services/location';
 import type { LocationSubscription } from 'expo-location';
 import AIChatModal from '../components/AIChatModal';
@@ -35,9 +35,20 @@ export default function HomeScreen() {
   const [selectedTripForAI, setSelectedTripForAI] = useState<any>(null);
   const { width } = useWindowDimensions();
 
+  const sessionIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     loadData();
     initializeLocation();
+    // Start analytics session
+    analyticsAPI.startSession('mobile').then((res) => {
+      if (res?.sessionId) sessionIdRef.current = res.sessionId;
+    }).catch(() => {});
+    // Track screen view
+    analyticsAPI.track({
+      eventType: 'screen_view',
+      eventName: 'home_screen',
+    }).catch(() => {});
   }, []);
 
   const initializeLocation = async () => {
@@ -63,6 +74,14 @@ export default function HomeScreen() {
         } catch (error) {
           console.log('Failed to update location on server:', error);
         }
+
+        // Track location for analytics
+        analyticsAPI.track({
+          eventType: 'location',
+          eventName: 'location_update',
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        }).catch(() => {});
 
         // Fetch nearby events
         try {

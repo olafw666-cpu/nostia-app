@@ -360,6 +360,132 @@ function initializeDatabase() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_users ON conversations(user1Id, user2Id)`);
 
+  // User consents table (consent versioning and audit trail)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_consents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      consentVersion TEXT NOT NULL,
+      locationConsent BOOLEAN NOT NULL,
+      dataCollectionConsent BOOLEAN NOT NULL,
+      privacyPolicyVersion TEXT NOT NULL,
+      ipAddress TEXT,
+      userAgent TEXT,
+      grantedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      revokedAt DATETIME,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Analytics events table (raw event tracking)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER,
+      sessionId TEXT NOT NULL,
+      eventType TEXT NOT NULL,
+      eventName TEXT NOT NULL,
+      eventData TEXT,
+      latitude REAL,
+      longitude REAL,
+      regionBucket TEXT,
+      duration INTEGER,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(userId)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(eventType)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(createdAt)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_events_region ON analytics_events(regionBucket)`);
+
+  // Analytics sessions table (session-level metrics)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS analytics_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER,
+      sessionId TEXT UNIQUE NOT NULL,
+      startedAt DATETIME NOT NULL,
+      endedAt DATETIME,
+      durationSeconds INTEGER,
+      eventCount INTEGER DEFAULT 0,
+      platform TEXT,
+      appVersion TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_sessions_user ON analytics_sessions(userId)`);
+
+  // Analytics aggregates table (pre-computed anonymized reports)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS analytics_aggregates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reportType TEXT NOT NULL,
+      periodStart DATETIME NOT NULL,
+      periodEnd DATETIME NOT NULL,
+      regionBucket TEXT,
+      metricName TEXT NOT NULL,
+      metricValue REAL NOT NULL,
+      sampleSize INTEGER,
+      metadata TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_agg_type ON analytics_aggregates(reportType, periodStart)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_analytics_agg_region ON analytics_aggregates(regionBucket)`);
+
+  // Analytics subscriptions table (paid dashboard access)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS analytics_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      plan TEXT NOT NULL,
+      stripeSubscriptionId TEXT,
+      status TEXT DEFAULT 'active',
+      startedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expiresAt DATETIME,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Report downloads table (purchased trend reports)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS report_downloads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      reportType TEXT NOT NULL,
+      reportParams TEXT,
+      stripePaymentIntentId TEXT,
+      amount REAL,
+      generatedAt DATETIME,
+      downloadUrl TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Add role column to users for admin access
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Add consent tracking columns to users
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN consentVersion TEXT`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN locationConsentGranted BOOLEAN DEFAULT 0`);
+  } catch (e) {
+    // Column already exists
+  }
+
   console.log('✅ Database tables initialized successfully');
 }
 

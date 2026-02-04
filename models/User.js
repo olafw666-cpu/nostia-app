@@ -20,6 +20,18 @@ class User {
     const user = stmt.get(id);
     if (user) {
       delete user.password;
+      delete user.latitude;
+      delete user.longitude;
+    }
+    return user;
+  }
+
+  // Internal method that retains location data (for server-side logic only)
+  static findByIdInternal(id) {
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const user = stmt.get(id);
+    if (user) {
+      delete user.password;
     }
     return user;
   }
@@ -34,8 +46,13 @@ class User {
     return stmt.get(email);
   }
 
+  static findByRole(role) {
+    const stmt = db.prepare('SELECT id, username, email, name, role, homeStatus, createdAt FROM users WHERE role = ?');
+    return stmt.all(role);
+  }
+
   static update(id, updates) {
-    const allowedFields = ['name', 'email', 'homeStatus', 'latitude', 'longitude'];
+    const allowedFields = ['name', 'email', 'homeStatus', 'latitude', 'longitude', 'role'];
     const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
 
     if (fields.length === 0) return this.findById(id);
@@ -56,7 +73,7 @@ class User {
   }
 
   static getAll() {
-    const stmt = db.prepare('SELECT id, username, email, name, homeStatus, latitude, longitude, createdAt FROM users');
+    const stmt = db.prepare('SELECT id, username, email, name, homeStatus, createdAt FROM users');
     return stmt.all();
   }
 

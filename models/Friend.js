@@ -48,7 +48,7 @@ class Friend {
   // Get all friends for a user (accepted only)
   static getFriends(userId) {
     const stmt = db.prepare(`
-      SELECT u.id, u.username, u.name, u.homeStatus, u.latitude, u.longitude
+      SELECT u.id, u.username, u.name, u.homeStatus
       FROM users u
       INNER JOIN friends f ON (
         (f.userId = ? AND f.friendId = u.id) OR

@@ -1,7 +1,11 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nostia-secret-key-change-in-production';
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Generate JWT token
 function generateToken(user) {
@@ -52,9 +56,43 @@ function optionalAuth(req, res, next) {
   next();
 }
 
+// Require valid consent middleware
+function requireConsent(req, res, next) {
+  const Consent = require('../models/Consent');
+  const ConsentService = require('../services/consentService');
+
+  const consent = Consent.getCurrentConsent(req.user.id);
+  const currentVersion = ConsentService.getCurrentConsentVersion();
+
+  if (!consent || consent.consentVersion !== currentVersion || !consent.locationConsent) {
+    return res.status(403).json({
+      error: 'Consent required',
+      consentRequired: true,
+      currentVersion
+    });
+  }
+  next();
+}
+
+// Require analytics access (admin or active subscription)
+function requireAnalyticsAccess(req, res, next) {
+  const AnalyticsSubscription = require('../models/AnalyticsSubscription');
+  const User = require('../models/User');
+
+  const user = User.findById(req.user.id);
+  if (user && user.role === 'admin') return next();
+
+  const sub = AnalyticsSubscription.getByUser(req.user.id);
+  if (sub && sub.status === 'active') return next();
+
+  return res.status(403).json({ error: 'Analytics access required. Subscribe or contact admin.' });
+}
+
 module.exports = {
   generateToken,
   authenticateToken,
   optionalAuth,
+  requireConsent,
+  requireAnalyticsAccess,
   JWT_SECRET
 };

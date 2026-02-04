@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { friendsAPI, messagesAPI } from '../services/api';
+import { friendsAPI, messagesAPI, analyticsAPI } from '../services/api';
 
 export default function FriendsScreen() {
   const navigation = useNavigation<any>();
@@ -72,6 +72,10 @@ export default function FriendsScreen() {
   const handleSendRequest = async (userId: number) => {
     try {
       await friendsAPI.sendRequest(userId);
+      analyticsAPI.track({
+        eventType: 'action',
+        eventName: 'friend_request_sent',
+      }).catch(() => {});
       Alert.alert('Success', 'Friend request sent!');
       setSearchQuery('');
       setSearchResults([]);
@@ -84,6 +88,10 @@ export default function FriendsScreen() {
   const handleAcceptRequest = async (requestId: number) => {
     try {
       await friendsAPI.acceptRequest(requestId);
+      analyticsAPI.track({
+        eventType: 'action',
+        eventName: 'friend_request_accepted',
+      }).catch(() => {});
       Alert.alert('Success', 'Friend request accepted!');
       loadData();
     } catch (error: any) {
