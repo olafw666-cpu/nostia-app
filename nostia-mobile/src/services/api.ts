@@ -3,9 +3,11 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Alert } from 'react-native';
 
-// Use environment config if available, fallback to local IP for development
+// Use EXPO_PUBLIC_API_URL env var, then Expo config, then fallback for local dev
 const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl || 'http://10.174.177.226:3000/api';
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl ||
+  'http://10.174.177.226:3000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
