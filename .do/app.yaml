@@ -1,0 +1,31 @@
+name: nostia
+services:
+  - name: nostia-backend
+    source_dir: /
+    environment_slug: node-js
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    http_port: 3000
+    run_command: npm start
+    health_check:
+      http_path: /health
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        type: SECRET
+      - key: STRIPE_SECRET_KEY
+        type: SECRET
+      - key: STRIPE_WEBHOOK_SECRET
+        type: SECRET
+      - key: ALLOWED_ORIGINS
+        value: ${APP_URL}
+
+static_sites:
+  - name: nostia-mobile
+    source_dir: /nostia-mobile
+    build_command: npm install && npm run build:web
+    output_dir: /dist
+    envs:
+      - key: EXPO_PUBLIC_API_URL
+        value: ${nostia-backend.PUBLIC_URL}/api

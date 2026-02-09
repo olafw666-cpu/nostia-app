@@ -87,23 +87,28 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Standard middleware
-app.use(cors());
+const corsOptions = process.env.NODE_ENV === 'production' && process.env.ALLOWED_ORIGINS
+  ? { origin: process.env.ALLOWED_ORIGINS.split(',') }
+  : {};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ==================== LOGGING MIDDLEWARE ====================
 
-// Structured request logging
-app.use((req, res, next) => {
-  const start = Date.now();
-  const originalEnd = res.end;
-  res.end = function (...args) {
-    const duration = Date.now() - start;
-    const logEntry = `${new Date().toISOString()} | ${req.method} ${req.path} | ${res.statusCode} | ${duration}ms | IP: ${req.ip}`;
-    console.log(logEntry);
-    originalEnd.apply(res, args);
-  };
-  next();
-});
+// Structured request logging (reduced in production to save CPU/storage)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const originalEnd = res.end;
+    res.end = function (...args) {
+      const duration = Date.now() - start;
+      const logEntry = `${new Date().toISOString()} | ${req.method} ${req.path} | ${res.statusCode} | ${duration}ms | IP: ${req.ip}`;
+      console.log(logEntry);
+      originalEnd.apply(res, args);
+    };
+    next();
+  });
+}
 
 // Audit logger for sensitive actions
 function auditLog(action, userId, details = {}) {
@@ -140,6 +145,11 @@ app.get('/', (req, res) => {
       'GDPR/CCPA Compliance'
     ]
   });
+});
+
+// Dedicated health check endpoint for DigitalOcean App Platform
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // ==================== AUTHENTICATION ROUTES ====================
@@ -1805,25 +1815,27 @@ app.use((err, req, res, next) => {
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {
-  console.log('\n🚀 ========================================');
-  console.log('🚀  NOSTIA MVP Backend Server');
-  console.log('🚀 ========================================');
-  console.log(`🚀  Server running on port ${PORT}`);
-  console.log(`🚀  API URL: http://localhost:${PORT}`);
-  console.log(`🚀  Mobile: Use your local IP address`);
-  console.log('🚀 ========================================');
-  console.log('🚀  Features:');
-  console.log('🚀  ✅ Friend Integration');
-  console.log('🚀  ✅ Social Feed & Events');
-  console.log('🚀  ✅ Trip Planning + Vault');
-  console.log('🚀  ✅ Adventure Discovery');
-  console.log('🚀  ✅ AI Content Generation');
-  console.log('🚀  ✅ User Consent & Access Control');
-  console.log('🚀  ✅ Analytics & Data Collection');
-  console.log('🚀  ✅ Data Aggregation & Heatmaps');
-  console.log('🚀  ✅ Analytics Monetization');
-  console.log('🚀  ✅ GDPR/CCPA Compliance');
-  console.log('🚀 ========================================\n');
+  console.log(`Nostia server running on port ${PORT}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('\n🚀 ========================================');
+    console.log('🚀  NOSTIA MVP Backend Server');
+    console.log('🚀 ========================================');
+    console.log(`🚀  API URL: http://localhost:${PORT}`);
+    console.log(`🚀  Mobile: Use your local IP address`);
+    console.log('🚀 ========================================');
+    console.log('🚀  Features:');
+    console.log('🚀  ✅ Friend Integration');
+    console.log('🚀  ✅ Social Feed & Events');
+    console.log('🚀  ✅ Trip Planning + Vault');
+    console.log('🚀  ✅ Adventure Discovery');
+    console.log('🚀  ✅ AI Content Generation');
+    console.log('🚀  ✅ User Consent & Access Control');
+    console.log('🚀  ✅ Analytics & Data Collection');
+    console.log('🚀  ✅ Data Aggregation & Heatmaps');
+    console.log('🚀  ✅ Analytics Monetization');
+    console.log('🚀  ✅ GDPR/CCPA Compliance');
+    console.log('🚀 ========================================\n');
+  }
 });
 
 module.exports = app;
