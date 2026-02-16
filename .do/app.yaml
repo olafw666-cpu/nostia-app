@@ -5,7 +5,7 @@ services:
     environment_slug: node-js
     instance_size_slug: apps-s-1vcpu-0.5gb
     instance_count: 1
-    http_port: 3000
+    http_port: 8080
     run_command: npm start
     health_check:
       http_path: /health

@@ -42,7 +42,7 @@ const AnalyticsSubscription = require('./models/AnalyticsSubscription');
 const AnalyticsService = require('./services/analyticsService');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // ==================== SECURITY MIDDLEWARE ====================
 
