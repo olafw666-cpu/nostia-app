@@ -45,8 +45,14 @@ const PORT = process.env.PORT || 8080;
 app.use(helmet());
 
 // HTTPS enforcement in production
+// Only redirect when x-forwarded-proto is explicitly 'http' (real browser traffic
+// through DigitalOcean's load balancer). Internal health check probes have no
+// x-forwarded-proto header and must not be redirected.
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] !== 'https') {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    req.headers['x-forwarded-proto'] === 'http'
+  ) {
     return res.redirect(301, `https://${req.headers.host}${req.url}`);
   }
   next();
