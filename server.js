@@ -428,6 +428,28 @@ app.delete('/api/friends/:friendId', authenticateToken, (req, res) => {
   }
 });
 
+// Get friends' locations (only those who have granted location consent)
+app.get('/api/friends/locations', authenticateToken, (req, res) => {
+  try {
+    const db = require('./database/db');
+    const locations = db.prepare(`
+      SELECT u.id, u.username, u.name, u.latitude, u.longitude, u.updatedAt
+      FROM users u
+      INNER JOIN friends f ON (
+        (f.userId = ? AND f.friendId = u.id) OR
+        (f.friendId = ? AND f.userId = u.id)
+      )
+      WHERE f.status = 'accepted'
+        AND u.latitude IS NOT NULL
+        AND u.longitude IS NOT NULL
+        AND u.locationConsentGranted = 1
+    `).all(req.user.id, req.user.id);
+    res.json(locations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== TRIP ROUTES ====================
 
 // Get all trips for current user

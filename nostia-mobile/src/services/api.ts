@@ -164,6 +164,11 @@ export const friendsAPI = {
     return response.data;
   },
 
+  getLocations: async () => {
+    const response = await api.get('/friends/locations');
+    return response.data;
+  },
+
   searchUsers: async (query: string) => {
     const response = await api.get(`/users/search?query=${encodeURIComponent(query)}`);
     return response.data;
