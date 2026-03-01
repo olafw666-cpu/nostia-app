@@ -8,6 +8,7 @@ import HomeScreen from '../screens/HomeScreen';
 import TripsScreen from '../screens/TripsScreen';
 import AdventuresScreen from '../screens/AdventuresScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import FriendsMapScreen from '../screens/FriendsMapScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
@@ -59,6 +60,8 @@ export default function MainNavigator() {
             iconName = focused ? 'compass' : 'compass-outline';
           } else if (route.name === 'FriendsTab') {
             iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'MapTab') {
+            iconName = focused ? 'map' : 'map-outline';
           } else if (route.name === 'NotificationsTab') {
             iconName = focused ? 'notifications' : 'notifications-outline';
           } else if (route.name === 'AnalyticsTab') {
@@ -135,6 +138,11 @@ export default function MainNavigator() {
         name="FriendsTab"
         component={FriendsScreen}
         options={{ title: 'Friends', headerTitle: 'My Friends' }}
+      />
+      <Tab.Screen
+        name="MapTab"
+        component={FriendsMapScreen}
+        options={{ title: 'Map', headerTitle: 'Friends Map' }}
       />
       <Tab.Screen
         name="NotificationsTab"
