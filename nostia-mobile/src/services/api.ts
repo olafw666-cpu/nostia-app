@@ -490,6 +490,62 @@ export const analyticsAPI = {
   },
 };
 
+// ===== Payments API (Stripe Connect) =====
+export const paymentsAPI = {
+  startOnboarding: async () => {
+    const response = await api.post('/stripe/onboard');
+    return response.data;
+  },
+
+  getOnboardingStatus: async () => {
+    const response = await api.get('/stripe/onboard/status');
+    return response.data;
+  },
+
+  createVault: async (totalAmount: number, members: number[]) => {
+    const response = await api.post('/vault/create', { totalAmount, members });
+    return response.data;
+  },
+
+  getVault: async (vaultId: number) => {
+    const response = await api.get(`/vault/${vaultId}`);
+    return response.data;
+  },
+
+  payVaultSplit: async (vaultId: number, memberId: number) => {
+    const response = await api.post('/vault/pay', { vaultId, memberId });
+    return response.data;
+  },
+
+  getPaymentMethods: async () => {
+    const response = await api.get('/payment-methods');
+    return response.data;
+  },
+
+  addPaymentMethod: async (details: {
+    stripePaymentMethodId: string;
+    type?: string;
+    brand?: string;
+    last4?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
+    isDefault?: boolean;
+  }) => {
+    const response = await api.post('/payment-methods', details);
+    return response.data;
+  },
+
+  setDefaultPaymentMethod: async (id: number) => {
+    const response = await api.put(`/payment-methods/${id}/default`);
+    return response.data;
+  },
+
+  deletePaymentMethod: async (id: number) => {
+    const response = await api.delete(`/payment-methods/${id}`);
+    return response.data;
+  },
+};
+
 // ===== Privacy API =====
 export const privacyAPI = {
   getPolicy: async () => {
