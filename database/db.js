@@ -466,6 +466,52 @@ function initializeDatabase() {
     )
   `);
 
+  // Stripe Connect columns on users
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN stripe_account_id TEXT`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN onboarding_complete BOOLEAN DEFAULT 0`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Vaults table (Stripe Connect payment collections)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vaults (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER NOT NULL,
+      total_amount REAL NOT NULL,
+      per_user_amount REAL NOT NULL,
+      status TEXT DEFAULT 'open',
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Vault members table (split payments per member)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vault_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      vault_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      owed_amount REAL NOT NULL,
+      charged_amount REAL NOT NULL,
+      status TEXT DEFAULT 'pending',
+      stripe_payment_intent_id TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(vault_id, user_id)
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_members_vault ON vault_members(vault_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_members_user ON vault_members(user_id)`);
+
   // Add role column to users for admin access
   try {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'`);

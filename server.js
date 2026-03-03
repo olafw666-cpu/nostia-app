@@ -16,6 +16,8 @@ function handleValidationErrors(req, res, next) {
 // Import middleware
 const { generateToken, authenticateToken, optionalAuth, requireConsent, requireAnalyticsAccess } = require('./middleware/auth');
 
+const db = require('./database/db');
+
 // Import models
 const User = require('./models/User');
 const Friend = require('./models/Friend');
@@ -28,6 +30,8 @@ const Message = require('./models/Message');
 
 // Import services
 const NotificationService = require('./services/notificationService');
+const { StripeService, calculateChargedAmount } = require('./services/stripeService');
+const Payment = require('./models/Payment');
 const Consent = require('./models/Consent');
 const ConsentService = require('./services/consentService');
 const AnalyticsEvent = require('./models/AnalyticsEvent');
@@ -92,6 +96,35 @@ const corsOptions = process.env.NODE_ENV === 'production' && process.env.ALLOWED
   ? { origin: process.env.ALLOWED_ORIGINS.split(',') }
   : {};
 app.use(cors(corsOptions));
+
+// Stripe webhook must receive raw body — registered before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!endpointSecret) {
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  let event;
+  try {
+    const Stripe = require('stripe');
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+  }
+
+  try {
+    await StripeService.handleWebhook(event);
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Webhook handler error:', err.message);
+    res.status(500).json({ error: 'Webhook handler failed' });
+  }
+});
+
 app.use(express.json());
 
 // ==================== LOGGING MIDDLEWARE ====================
@@ -1589,6 +1622,164 @@ app.post('/api/privacy/delete-data', authenticateToken, (req, res) => {
   }
 });
 
+// ==================== STRIPE CONNECT ROUTES ====================
+
+// Start Stripe Connect onboarding for vault creators
+app.post('/api/stripe/onboard', authenticateToken, async (req, res) => {
+  try {
+    const { url, accountId } = await StripeService.createOnboardingLink(req.user.id);
+    res.json({ url, accountId });
+  } catch (error) {
+    console.error('Stripe onboarding error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check onboarding status
+app.get('/api/stripe/onboard/status', authenticateToken, async (req, res) => {
+  try {
+    const complete = await StripeService.checkOnboardingComplete(req.user.id);
+    const user = db.prepare('SELECT stripe_account_id, onboarding_complete FROM users WHERE id = ?').get(req.user.id);
+    res.json({ complete, stripeAccountId: user?.stripe_account_id || null });
+  } catch (error) {
+    console.error('Onboarding status error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== VAULT (STRIPE CONNECT) ROUTES ====================
+
+// Create a vault with split members
+// POST /api/vault/create  { totalAmount, members: [userId, ...] }
+app.post('/api/vault/create', authenticateToken, [
+  body('totalAmount').isFloat({ gt: 0 }).withMessage('totalAmount must be a positive number'),
+  body('members').isArray({ min: 1 }).withMessage('members must be a non-empty array'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const ownerId = req.user.id;
+    const { totalAmount, members } = req.body;
+
+    // Verify owner has completed onboarding
+    const owner = db.prepare('SELECT stripe_account_id, onboarding_complete FROM users WHERE id = ?').get(ownerId);
+    if (!owner?.stripe_account_id || !owner.onboarding_complete) {
+      return res.status(400).json({ error: 'You must complete Stripe onboarding before creating a vault' });
+    }
+
+    const memberCount = members.length;
+    const perUserAmount = Math.round((totalAmount / memberCount) * 100) / 100;
+    const chargedAmount = calculateChargedAmount(perUserAmount);
+
+    const vaultResult = db.prepare(`
+      INSERT INTO vaults (owner_id, total_amount, per_user_amount, status)
+      VALUES (?, ?, ?, 'open')
+    `).run(ownerId, totalAmount, perUserAmount);
+
+    const vaultId = vaultResult.lastInsertRowid;
+
+    const insertMember = db.prepare(`
+      INSERT INTO vault_members (vault_id, user_id, owed_amount, charged_amount, status)
+      VALUES (?, ?, ?, ?, 'pending')
+    `);
+
+    for (const userId of members) {
+      insertMember.run(vaultId, userId, perUserAmount, chargedAmount);
+    }
+
+    res.status(201).json({ vaultId, perUserAmount, chargedAmount });
+  } catch (error) {
+    console.error('Vault create error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get vault details (owner and members)
+app.get('/api/vault/:vaultId', authenticateToken, (req, res) => {
+  try {
+    const vault = db.prepare('SELECT * FROM vaults WHERE id = ?').get(req.params.vaultId);
+    if (!vault) return res.status(404).json({ error: 'Vault not found' });
+
+    const members = db.prepare(`
+      SELECT vm.*, u.username, u.name
+      FROM vault_members vm
+      INNER JOIN users u ON vm.user_id = u.id
+      WHERE vm.vault_id = ?
+    `).all(req.params.vaultId);
+
+    res.json({ vault, members });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create PaymentIntent for a vault member's split
+// POST /api/vault/pay  { vaultId, memberId }
+app.post('/api/vault/pay', authenticateToken, [
+  body('vaultId').isInt({ gt: 0 }).withMessage('vaultId is required'),
+  body('memberId').isInt({ gt: 0 }).withMessage('memberId is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { vaultId, memberId } = req.body;
+
+    // Confirm the authenticated user is the member
+    const member = db.prepare('SELECT * FROM vault_members WHERE id = ? AND vault_id = ?').get(memberId, vaultId);
+    if (!member) return res.status(404).json({ error: 'Vault member not found' });
+    if (member.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const intent = await StripeService.createVaultPaymentIntent(vaultId, memberId);
+    res.json({ clientSecret: intent.client_secret });
+  } catch (error) {
+    console.error('Vault pay error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PAYMENT METHODS ROUTES ====================
+
+// Get user's saved payment methods
+app.get('/api/payment-methods', authenticateToken, (req, res) => {
+  try {
+    res.json(Payment.getUserPaymentMethods(req.user.id));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a payment method
+app.post('/api/payment-methods', authenticateToken, [
+  body('stripePaymentMethodId').notEmpty().withMessage('stripePaymentMethodId is required'),
+  handleValidationErrors
+], (req, res) => {
+  try {
+    const { stripePaymentMethodId, type, brand, last4, expiryMonth, expiryYear, isDefault } = req.body;
+    Payment.addPaymentMethod(req.user.id, stripePaymentMethodId, { type, brand, last4, expiryMonth, expiryYear, isDefault });
+    res.status(201).json({ message: 'Payment method added' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Set default payment method
+app.put('/api/payment-methods/:id/default', authenticateToken, (req, res) => {
+  try {
+    Payment.setDefaultPaymentMethod(req.user.id, req.params.id);
+    res.json({ message: 'Default payment method updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a payment method
+app.delete('/api/payment-methods/:id', authenticateToken, (req, res) => {
+  try {
+    Payment.deletePaymentMethod(req.params.id, req.user.id);
+    res.json({ message: 'Payment method removed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== ERROR HANDLING ====================
 
 // 404 handler
@@ -1624,6 +1815,7 @@ app.listen(PORT, () => {
     console.log('🚀  ✅ Data Aggregation & Heatmaps');
     console.log('🚀  ✅ Analytics Monetization');
     console.log('🚀  ✅ GDPR/CCPA Compliance');
+    console.log('🚀  ✅ Stripe Connect Payments (Vault)');
     console.log('🚀 ========================================\n');
   }
 });
