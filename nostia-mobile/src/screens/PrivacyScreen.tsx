@@ -15,6 +15,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -154,7 +155,7 @@ export default function PrivacyScreen() {
                     text: 'OK',
                     onPress: async () => {
                       await SecureStore.deleteItemAsync('jwt_token');
-                      (navigation as any).replace('Login');
+                      DeviceEventEmitter.emit('app-unauthenticated');
                     },
                   },
                 ]

@@ -15,6 +15,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { DeviceEventEmitter } from 'react-native';
 import { authAPI } from '../services/api';
 import ConsentModal from '../components/ConsentModal';
 
@@ -79,7 +80,7 @@ export default function SignupScreen() {
       );
 
       Alert.alert('Success!', `Welcome to Nostia, ${name}!`, [
-        { text: 'OK', onPress: () => (navigation as any).replace('Main') },
+        { text: 'OK', onPress: () => DeviceEventEmitter.emit('app-authenticated') },
       ]);
     } catch (error: any) {
       console.log('Signup error:', error.response?.data || error.message);
@@ -116,7 +117,7 @@ export default function SignupScreen() {
       );
 
       Alert.alert('Success!', `Welcome to Nostia, ${name}!`, [
-        { text: 'OK', onPress: () => (navigation as any).replace('Main') },
+        { text: 'OK', onPress: () => DeviceEventEmitter.emit('app-authenticated') },
       ]);
     } catch (error: any) {
       console.log('Signup error:', error.response?.data || error.message);

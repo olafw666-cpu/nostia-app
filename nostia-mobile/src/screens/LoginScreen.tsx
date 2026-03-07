@@ -14,9 +14,9 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { DeviceEventEmitter } from 'react-native';
 import { authAPI } from '../services/api';
 
 export default function LoginScreen() {
@@ -36,7 +36,7 @@ export default function LoginScreen() {
 
     try {
       await authAPI.login(trimmedUsername, password);
-      (navigation as any).replace('Main');
+      DeviceEventEmitter.emit('app-authenticated');
     } catch (error: any) {
       if (error.response?.status === 401) {
         Alert.alert('Login Failed', 'Invalid username or password');
