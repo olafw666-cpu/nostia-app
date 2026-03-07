@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, DeviceEventEmitter } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import Toast, { toastConfig } from './src/components/Toast';
 
@@ -26,6 +26,12 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
+    const loginSub = DeviceEventEmitter.addListener('app-authenticated', () => setIsAuthenticated(true));
+    const logoutSub = DeviceEventEmitter.addListener('app-unauthenticated', () => setIsAuthenticated(false));
+    return () => {
+      loginSub.remove();
+      logoutSub.remove();
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -65,35 +71,42 @@ export default function App() {
             },
           }}
         >
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Signup"
-            component={SignupScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Main"
-            component={MainNavigator}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Vault"
-            component={VaultScreen}
-            options={({ route }: any) => ({
-              title: route.params?.tripTitle || 'Vault',
-            })}
-          />
-          <Stack.Screen
-            name="Chat"
-            component={ChatScreen}
-            options={({ route }: any) => ({
-              title: route.params?.friendName || 'Chat',
-            })}
-          />
+          {!isAuthenticated ? (
+            <>
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Signup"
+                component={SignupScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          ) : (
+            <>
+              <Stack.Screen
+                name="Main"
+                component={MainNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Vault"
+                component={VaultScreen}
+                options={({ route }: any) => ({
+                  title: route.params?.tripTitle || 'Vault',
+                })}
+              />
+              <Stack.Screen
+                name="Chat"
+                component={ChatScreen}
+                options={({ route }: any) => ({
+                  title: route.params?.friendName || 'Chat',
+                })}
+              />
+            </>
+          )}
         </Stack.Navigator>
         <Toast config={toastConfig} />
       </NavigationContainer>
