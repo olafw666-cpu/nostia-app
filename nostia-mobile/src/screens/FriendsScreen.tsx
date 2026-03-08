@@ -22,6 +22,7 @@ export default function FriendsScreen() {
   const [requests, setRequests] = useState({ received: [], sent: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [searchPerformed, setSearchPerformed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -56,11 +57,13 @@ export default function FriendsScreen() {
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
+      setSearchPerformed(false);
       return;
     }
 
     try {
       setSearchLoading(true);
+      setSearchPerformed(true);
       const results = await friendsAPI.searchUsers(searchQuery);
       setSearchResults(results);
     } catch (error: any) {
@@ -203,7 +206,7 @@ export default function FriendsScreen() {
             placeholder="Search users..."
             placeholderTextColor="#6B7280"
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => { setSearchQuery(text); if (!text.trim()) { setSearchResults([]); setSearchPerformed(false); } }}
             onSubmitEditing={handleSearch}
           />
         </View>
@@ -213,7 +216,7 @@ export default function FriendsScreen() {
       </View>
 
       {/* Tab Selector */}
-      {searchResults.length === 0 && (
+      {!searchPerformed && searchResults.length === 0 && (
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
@@ -238,6 +241,12 @@ export default function FriendsScreen() {
       {searchLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      ) : searchPerformed && searchResults.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="person-outline" size={64} color="#6B7280" />
+          <Text style={styles.emptyText}>No users found</Text>
+          <Text style={styles.emptySubtext}>Try a different name or username</Text>
         </View>
       ) : searchResults.length > 0 ? (
         <FlatList
