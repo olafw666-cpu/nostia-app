@@ -46,9 +46,31 @@ export default function MainNavigator() {
     }
   };
 
+  const HeaderRight = ({ navigation }: { navigation: any }) => (
+    <View style={styles.headerRight}>
+      <TouchableOpacity
+        style={styles.headerIconButton}
+        onPress={() => navigation.navigate('NotificationsTab')}
+      >
+        <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+        {unreadCount > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.headerIconButton}
+        onPress={() => navigation.navigate('SettingsTab')}
+      >
+        <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route, navigation }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
@@ -62,12 +84,6 @@ export default function MainNavigator() {
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'MapTab') {
             iconName = focused ? 'map' : 'map-outline';
-          } else if (route.name === 'NotificationsTab') {
-            iconName = focused ? 'notifications' : 'notifications-outline';
-          } else if (route.name === 'AnalyticsTab') {
-            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-          } else if (route.name === 'PrivacyTab') {
-            iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
           } else {
             iconName = 'help-outline';
           }
@@ -76,26 +92,13 @@ export default function MainNavigator() {
           const scale = new Animated.Value(focused ? 1.1 : 1);
           const opacity = new Animated.Value(focused ? 1 : 0.6);
 
-          // Show badge for notifications
-          if (route.name === 'NotificationsTab' && unreadCount > 0) {
-            return (
-              <View>
-                <Animated.View style={{ transform: [{ scale }], opacity }}>
-                  <Ionicons name={iconName} size={size} color={color} />
-                </Animated.View>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              </View>
-            );
-          }
-
           return (
             <Animated.View style={{ transform: [{ scale }], opacity }}>
               <Ionicons name={iconName} size={size} color={color} />
             </Animated.View>
           );
         },
+        tabBarShowLabel: false,
         tabBarActiveTintColor: '#3B82F6',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
@@ -106,10 +109,6 @@ export default function MainNavigator() {
           paddingTop: 8,
           height: 60,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
         headerStyle: {
           backgroundColor: '#1F2937',
         },
@@ -117,40 +116,43 @@ export default function MainNavigator() {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerRight: () => <HeaderRight navigation={navigation} />,
       })}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeScreen}
-        options={{ title: 'Home', headerTitle: 'Nostia' }}
+        options={{ headerTitle: 'Nostia' }}
       />
       <Tab.Screen
         name="TripsTab"
         component={TripsScreen}
-        options={{ title: 'Trips', headerTitle: 'My Trips' }}
+        options={{ headerTitle: 'My Trips' }}
       />
       <Tab.Screen
         name="DiscoverTab"
         component={AdventuresScreen}
-        options={{ title: 'Discover', headerTitle: 'Discover Adventures' }}
+        options={{ headerTitle: 'Discover Adventures' }}
       />
       <Tab.Screen
         name="FriendsTab"
         component={FriendsScreen}
-        options={{ title: 'Friends', headerTitle: 'My Friends' }}
+        options={{ headerTitle: 'My Friends' }}
       />
       <Tab.Screen
         name="MapTab"
         component={FriendsMapScreen}
-        options={{ title: 'Map', headerTitle: 'Friends Map' }}
+        options={{ headerTitle: 'Friends Map' }}
       />
       <Tab.Screen
         name="NotificationsTab"
         component={NotificationsScreen}
-        options={{ title: 'Alerts', headerTitle: 'Notifications' }}
+        options={{
+          headerTitle: 'Notifications',
+          tabBarButton: () => null,
+        }}
         listeners={{
           tabPress: () => {
-            // Refresh unread count when tab is pressed
             setTimeout(loadUnreadCount, 500);
           },
         }}
@@ -159,23 +161,38 @@ export default function MainNavigator() {
         <Tab.Screen
           name="AnalyticsTab"
           component={AnalyticsScreen}
-          options={{ title: 'Analytics', headerTitle: 'Analytics Dashboard' }}
+          options={{
+            headerTitle: 'Analytics Dashboard',
+            tabBarButton: () => null,
+          }}
         />
       )}
       <Tab.Screen
-        name="PrivacyTab"
+        name="SettingsTab"
         component={PrivacyScreen}
-        options={{ title: 'Privacy', headerTitle: 'Privacy & Settings' }}
+        options={{
+          headerTitle: 'Settings',
+          tabBarButton: () => null,
+        }}
       />
     </Tab.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    gap: 4,
+  },
+  headerIconButton: {
+    padding: 6,
+  },
   badge: {
     position: 'absolute',
-    right: -8,
-    top: -4,
+    right: 2,
+    top: 2,
     backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,

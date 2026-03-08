@@ -24,12 +24,13 @@ export default function AdventuresScreen() {
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'adventures' | 'feed'>('feed');
+  const [activeTab, setActiveTab] = useState<'adventures' | 'feed'>('adventures');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const [trips, setTrips] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -49,14 +50,16 @@ export default function AdventuresScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [adventuresData, feedData, tripsData] = await Promise.all([
+      const [adventuresData, feedData, tripsData, userData] = await Promise.all([
         adventuresAPI.getAll(),
         feedAPI.getUserFeed(20),
         tripsAPI.getAll().catch(() => []),
+        authAPI.getMe().catch(() => null),
       ]);
       setAdventures(adventuresData);
       setFeed(feedData);
       setTrips(tripsData);
+      setCurrentUser(userData);
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.error || 'Failed to load data');
     } finally {
@@ -132,7 +135,8 @@ export default function AdventuresScreen() {
   };
 
   const handleAddToTrip = (adventure: any) => {
-    if (trips.length === 0) {
+    const ownedTrips = trips.filter((t: any) => t.createdBy === currentUser?.id);
+    if (ownedTrips.length === 0) {
       Alert.alert('No Trips', 'Create a trip first before adding adventures to it.');
       return;
     }
@@ -140,7 +144,7 @@ export default function AdventuresScreen() {
       'Add to Trip',
       `Add "${adventure.title}" to which trip?`,
       [
-        ...trips.map((trip: any) => ({
+        ...ownedTrips.map((trip: any) => ({
           text: trip.title,
           onPress: async () => {
             try {

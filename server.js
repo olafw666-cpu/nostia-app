@@ -985,11 +985,12 @@ app.get('/api/users/search', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
+    const lowerQuery = query.toLowerCase();
     const users = User.getAll();
     const results = users.filter(user =>
       user.id !== req.user.id && (
-        user.username.toLowerCase().includes(query.toLowerCase()) ||
-        user.name.toLowerCase().includes(query.toLowerCase())
+        (user.username && user.username.toLowerCase().includes(lowerQuery)) ||
+        (user.name && user.name.toLowerCase().includes(lowerQuery))
       )
     );
 

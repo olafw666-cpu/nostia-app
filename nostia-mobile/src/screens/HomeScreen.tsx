@@ -183,25 +183,6 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      {/* Location Status */}
-      <View style={styles.locationCard}>
-        <View style={styles.locationHeader}>
-          <Ionicons
-            name={location ? "location" : "location-outline"}
-            size={20}
-            color={location ? "#10B981" : locationPermissionDenied ? "#EF4444" : "#9CA3AF"}
-          />
-          <Text style={styles.locationTitle}>Location</Text>
-        </View>
-        <Text style={styles.locationStatus}>
-          {location
-            ? `Location active`
-            : locationPermissionDenied
-              ? 'Permission denied - enable in settings'
-              : 'Fetching location...'}
-        </Text>
-      </View>
-
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
         <TouchableOpacity style={styles.statCard} onPress={() => (navigation as any).navigate('TripsTab')} activeOpacity={0.7}>
@@ -534,29 +515,5 @@ const styles = StyleSheet.create({
     fontSize: ms(12),
     color: '#FFFFFF',
     fontWeight: '600',
-  },
-  locationCard: {
-    backgroundColor: '#1F2937',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  locationTitle: {
-    fontSize: ms(14),
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  locationStatus: {
-    fontSize: ms(12),
-    color: '#9CA3AF',
-    marginLeft: 28,
   },
 });
