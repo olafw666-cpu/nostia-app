@@ -32,4 +32,12 @@ final class TripsAPI {
     func delete(_ id: Int) async throws {
         try await client.requestVoid("/trips/\(id)", method: "DELETE")
     }
+
+    func addParticipant(tripId: Int, userId: Int) async throws -> Trip {
+        return try await client.request("/trips/\(tripId)/participants", method: "POST", body: ["userId": userId])
+    }
+
+    func removeParticipant(tripId: Int, userId: Int) async throws -> Trip {
+        return try await client.request("/trips/\(tripId)/participants/\(userId)", method: "DELETE")
+    }
 }

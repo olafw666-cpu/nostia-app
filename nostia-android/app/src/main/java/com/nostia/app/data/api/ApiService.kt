@@ -42,6 +42,18 @@ interface ApiService {
     @DELETE("trips/{id}")
     suspend fun deleteTrip(@Path("id") id: Int): Response<SuccessResponse>
 
+    @POST("trips/{id}/participants")
+    suspend fun addTripParticipant(
+        @Path("id") tripId: Int,
+        @Body request: AddParticipantRequest
+    ): Response<Trip>
+
+    @DELETE("trips/{id}/participants/{userId}")
+    suspend fun removeTripParticipant(
+        @Path("id") tripId: Int,
+        @Path("userId") userId: Int
+    ): Response<Trip>
+
     // ── Friends ───────────────────────────────────────────────────────────────
 
     @GET("friends")

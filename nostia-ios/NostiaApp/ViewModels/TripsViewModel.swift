@@ -52,4 +52,30 @@ final class TripsViewModel: ObservableObject {
             return false
         }
     }
+
+    func addParticipant(tripId: Int, userId: Int) async -> Bool {
+        do {
+            let updated = try await TripsAPI.shared.addParticipant(tripId: tripId, userId: userId)
+            if let idx = trips.firstIndex(where: { $0.id == tripId }) {
+                trips[idx] = updated
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func removeParticipant(tripId: Int, userId: Int) async -> Bool {
+        do {
+            let updated = try await TripsAPI.shared.removeParticipant(tripId: tripId, userId: userId)
+            if let idx = trips.firstIndex(where: { $0.id == tripId }) {
+                trips[idx] = updated
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
 }

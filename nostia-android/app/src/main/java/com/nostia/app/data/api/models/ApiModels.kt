@@ -48,6 +48,17 @@ data class UpdateUserRequest(
 
 // ── Trips ─────────────────────────────────────────────────────────────────────
 
+data class TripParticipant(
+    val id: Int,
+    val username: String,
+    val name: String,
+    val role: String?
+)
+
+data class AddParticipantRequest(
+    val userId: Int
+)
+
 data class Trip(
     val id: Int,
     val title: String,
@@ -55,7 +66,9 @@ data class Trip(
     val description: String?,
     val startDate: String?,
     val endDate: String?,
-    @SerializedName("createdAt") val createdAt: String?
+    @SerializedName("createdAt") val createdAt: String?,
+    val participants: List<TripParticipant> = emptyList(),
+    @SerializedName("createdBy") val createdBy: Int? = null
 )
 
 data class CreateTripRequest(
