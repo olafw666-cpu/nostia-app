@@ -20,7 +20,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { tripsAPI } from '../services/api';
+import { tripsAPI, friendsAPI } from '../services/api';
 import CreateTripModal from '../components/CreateTripModal';
 
 export default function TripsScreen() {
@@ -30,6 +30,7 @@ export default function TripsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
+  const [managingParticipantsTrip, setManagingParticipantsTrip] = useState<any>(null);
 
   useEffect(() => {
     loadTrips();
@@ -116,6 +117,9 @@ export default function TripsScreen() {
           <Text style={styles.statText}>{item.participants?.length || 0} people</Text>
         </View>
         <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.editTripButton} onPress={() => setManagingParticipantsTrip(item)}>
+            <Ionicons name="people-outline" size={15} color="#9CA3AF" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.editTripButton} onPress={() => setEditingTrip(item)}>
             <Ionicons name="pencil-outline" size={15} color="#9CA3AF" />
           </TouchableOpacity>
@@ -185,6 +189,13 @@ export default function TripsScreen() {
         trip={editingTrip}
         onClose={() => setEditingTrip(null)}
         onSaved={() => { setEditingTrip(null); loadTrips(); }}
+      />
+
+      <ManageParticipantsModal
+        visible={!!managingParticipantsTrip}
+        trip={managingParticipantsTrip}
+        onClose={() => setManagingParticipantsTrip(null)}
+        onUpdated={() => { loadTrips(); }}
       />
 
     </View>
@@ -264,6 +275,138 @@ function EditTripModal({ visible, trip, onClose, onSaved }: { visible: boolean; 
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ManageParticipantsModal({ visible, trip, onClose, onUpdated }: { visible: boolean; trip: any; onClose: () => void; onUpdated: () => void }) {
+  const [friends, setFriends] = useState<any[]>([]);
+  const [currentTrip, setCurrentTrip] = useState<any>(trip);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (visible && trip) {
+      setCurrentTrip(trip);
+      loadFriends();
+    }
+  }, [visible, trip]);
+
+  const loadFriends = async () => {
+    setLoading(true);
+    try {
+      const data = await friendsAPI.getAll();
+      setFriends(data);
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshTrip = async () => {
+    try {
+      const updated = await tripsAPI.getById(trip.id);
+      setCurrentTrip(updated);
+      onUpdated();
+    } catch {}
+  };
+
+  const handleAdd = async (friendId: number) => {
+    setActionLoading(friendId);
+    try {
+      await tripsAPI.addParticipant(trip.id, friendId);
+      await refreshTrip();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to add participant');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemove = async (userId: number) => {
+    setActionLoading(userId);
+    try {
+      await tripsAPI.removeParticipant(trip.id, userId);
+      await refreshTrip();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to remove participant');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const participants: any[] = currentTrip?.participants || [];
+  const participantIds = new Set(participants.map((p: any) => p.id));
+  const friendsToAdd = friends.filter((f: any) => !participantIds.has(f.id));
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: '#1F2937', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%', paddingBottom: 32 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#374151' }}>
+            <Text style={{ fontSize: ms(18), fontWeight: 'bold', color: '#FFFFFF' }}>Manage People</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={28} color="#FFFFFF" /></TouchableOpacity>
+          </View>
+          <ScrollView style={{ padding: 20 }}>
+            <Text style={{ fontSize: ms(13), fontWeight: '600', color: '#9CA3AF', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Current Participants</Text>
+            {participants.length === 0 ? (
+              <Text style={{ color: '#6B7280', marginBottom: 16 }}>No participants yet</Text>
+            ) : (
+              participants.map((p: any) => (
+                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#374151', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#3B82F6', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: ms(14) }}>{p.name?.charAt(0) || 'U'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: ms(14) }}>{p.name}</Text>
+                    <Text style={{ color: '#9CA3AF', fontSize: ms(12) }}>@{p.username} · {p.role}</Text>
+                  </View>
+                  {p.role !== 'creator' && (
+                    <TouchableOpacity
+                      onPress={() => handleRemove(p.id)}
+                      disabled={actionLoading === p.id}
+                      style={{ padding: 6 }}
+                    >
+                      {actionLoading === p.id
+                        ? <ActivityIndicator size="small" color="#EF4444" />
+                        : <Ionicons name="remove-circle-outline" size={22} color="#EF4444" />}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            )}
+
+            <Text style={{ fontSize: ms(13), fontWeight: '600', color: '#9CA3AF', marginTop: 20, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Add Friends</Text>
+            {loading ? (
+              <ActivityIndicator color="#3B82F6" style={{ marginVertical: 16 }} />
+            ) : friendsToAdd.length === 0 ? (
+              <Text style={{ color: '#6B7280' }}>All friends are already on this trip</Text>
+            ) : (
+              friendsToAdd.map((f: any) => (
+                <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#374151', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: ms(14) }}>{f.name?.charAt(0) || 'U'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: ms(14) }}>{f.name}</Text>
+                    <Text style={{ color: '#9CA3AF', fontSize: ms(12) }}>@{f.username}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleAdd(f.id)}
+                    disabled={actionLoading === f.id}
+                    style={{ backgroundColor: '#3B82F6', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}
+                  >
+                    {actionLoading === f.id
+                      ? <ActivityIndicator size="small" color="#FFFFFF" />
+                      : <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: ms(13) }}>Add</Text>}
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 }

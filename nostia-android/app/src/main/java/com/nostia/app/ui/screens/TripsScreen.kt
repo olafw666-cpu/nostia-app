@@ -15,10 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,11 +51,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nostia.app.data.api.ApiService
+import com.nostia.app.data.api.models.AddParticipantRequest
 import com.nostia.app.data.api.models.CreateTripRequest
 import com.nostia.app.data.api.models.Trip
+import com.nostia.app.data.api.models.User
 import com.nostia.app.ui.theme.NostiaBackground
 import com.nostia.app.ui.theme.NostiaBorder
+import com.nostia.app.ui.theme.NostiaError
 import com.nostia.app.ui.theme.NostiaPrimary
+import com.nostia.app.ui.theme.NostiaSuccess
 import com.nostia.app.ui.theme.NostiaSurface
 import com.nostia.app.ui.theme.NostiaTextPrimary
 import com.nostia.app.ui.theme.NostiaTextSecondary
@@ -68,6 +77,7 @@ fun TripsScreen(
     var isLoading by remember { mutableStateOf(true) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var tripToDelete by remember { mutableStateOf<Trip?>(null) }
+    var managingParticipantsTrip by remember { mutableStateOf<Trip?>(null) }
 
     fun loadTrips() {
         scope.launch {
@@ -185,17 +195,47 @@ fun TripsScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Long-press to delete · Tap to open vault",
-                                    fontSize = 11.sp,
-                                    color = NostiaTextSecondary
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${trip.participants.size} people · Tap to open vault",
+                                        fontSize = 11.sp,
+                                        color = NostiaTextSecondary
+                                    )
+                                    IconButton(
+                                        onClick = { managingParticipantsTrip = trip },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Person,
+                                            contentDescription = "Manage People",
+                                            tint = NostiaTextSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    managingParticipantsTrip?.let { trip ->
+        ManageParticipantsDialog(
+            trip = trip,
+            apiService = apiService,
+            onUnauthorized = onUnauthorized,
+            onDismiss = { managingParticipantsTrip = null },
+            onTripUpdated = { updatedTrip ->
+                trips = trips.map { if (it.id == updatedTrip.id) updatedTrip else it }
+                managingParticipantsTrip = updatedTrip
+            }
+        )
     }
 
     if (showCreateDialog) {
@@ -411,6 +451,171 @@ private fun CreateTripDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel", color = NostiaTextSecondary)
+            }
+        },
+        containerColor = NostiaSurface
+    )
+}
+
+@Composable
+private fun ManageParticipantsDialog(
+    trip: Trip,
+    apiService: ApiService,
+    onUnauthorized: () -> Unit,
+    onDismiss: () -> Unit,
+    onTripUpdated: (Trip) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var friends by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isLoadingFriends by remember { mutableStateOf(true) }
+    var actionLoadingId by remember { mutableStateOf<Int?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val response = apiService.getFriends()
+            if (response.code() == 401) { onUnauthorized(); return@LaunchedEffect }
+            if (response.isSuccessful) friends = response.body() ?: emptyList()
+        } catch (_: Exception) {}
+        isLoadingFriends = false
+    }
+
+    val participantIds = trip.participants.map { it.id }.toSet()
+    val friendsToAdd = friends.filter { it.id !in participantIds }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage People", color = NostiaTextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "CURRENT PARTICIPANTS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NostiaTextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (trip.participants.isEmpty()) {
+                    Text("No participants yet", fontSize = 13.sp, color = NostiaTextSecondary, modifier = Modifier.padding(bottom = 12.dp))
+                } else {
+                    trip.participants.forEach { participant ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(participant.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = NostiaTextPrimary)
+                                Text("@${participant.username}${if (participant.role != null) " · ${participant.role}" else ""}", fontSize = 12.sp, color = NostiaTextSecondary)
+                            }
+                            if (participant.role != "creator") {
+                                if (actionLoadingId == participant.id) {
+                                    CircularProgressIndicator(color = NostiaError, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                                } else {
+                                    TextButton(
+                                        onClick = {
+                                            scope.launch {
+                                                actionLoadingId = participant.id
+                                                errorMessage = null
+                                                try {
+                                                    val response = apiService.removeTripParticipant(trip.id, participant.id)
+                                                    if (response.code() == 401) { onUnauthorized(); return@launch }
+                                                    if (response.isSuccessful) {
+                                                        response.body()?.let { onTripUpdated(it) }
+                                                    } else {
+                                                        errorMessage = "Failed to remove (${response.code()})"
+                                                    }
+                                                } catch (e: Exception) {
+                                                    errorMessage = "Error: ${e.message}"
+                                                } finally {
+                                                    actionLoadingId = null
+                                                }
+                                            }
+                                        },
+                                        enabled = actionLoadingId == null
+                                    ) {
+                                        Text("Remove", color = NostiaError, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                        Divider(color = NostiaBorder, thickness = 0.5.dp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "ADD FRIENDS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NostiaTextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (isLoadingFriends) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = NostiaPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                    }
+                } else if (friendsToAdd.isEmpty()) {
+                    Text("All friends are already on this trip", fontSize = 13.sp, color = NostiaTextSecondary)
+                } else {
+                    friendsToAdd.forEach { friend ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(friend.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = NostiaTextPrimary)
+                                Text("@${friend.username}", fontSize = 12.sp, color = NostiaTextSecondary)
+                            }
+                            if (actionLoadingId == friend.id) {
+                                CircularProgressIndicator(color = NostiaPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                            } else {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            actionLoadingId = friend.id
+                                            errorMessage = null
+                                            try {
+                                                val response = apiService.addTripParticipant(trip.id, AddParticipantRequest(friend.id))
+                                                if (response.code() == 401) { onUnauthorized(); return@launch }
+                                                if (response.isSuccessful) {
+                                                    response.body()?.let { onTripUpdated(it) }
+                                                } else {
+                                                    errorMessage = "Failed to add (${response.code()})"
+                                                }
+                                            } catch (e: Exception) {
+                                                errorMessage = "Error: ${e.message}"
+                                            } finally {
+                                                actionLoadingId = null
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NostiaPrimary),
+                                    enabled = actionLoadingId == null
+                                ) {
+                                    Text("Add", color = NostiaTextPrimary, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        Divider(color = NostiaBorder, thickness = 0.5.dp)
+                    }
+                }
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(errorMessage!!, color = NostiaError, fontSize = 13.sp)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = NostiaTextSecondary)
             }
         },
         containerColor = NostiaSurface

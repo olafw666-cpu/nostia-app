@@ -5,6 +5,7 @@ struct TripsView: View {
     @State private var showCreateSheet = false
     @State private var editingTrip: Trip?
     @State private var tripToVault: Trip?
+    @State private var managingParticipantsTrip: Trip?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -16,6 +17,7 @@ struct TripsView: View {
                         TripCard(trip: trip,
                                  onVault: { tripToVault = trip },
                                  onEdit: { editingTrip = trip },
+                                 onManagePeople: { managingParticipantsTrip = trip },
                                  onDelete: { Task { await vm.deleteTrip(trip.id) } })
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
@@ -57,6 +59,9 @@ struct TripsView: View {
                 if ok { editingTrip = nil }
             }
         }
+        .sheet(item: $managingParticipantsTrip) { trip in
+            ManageParticipantsSheet(initialTrip: trip, vm: vm)
+        }
         .navigationDestination(item: $tripToVault) { trip in
             VaultView(tripId: trip.id, tripTitle: trip.title)
         }
@@ -67,6 +72,7 @@ struct TripCard: View {
     let trip: Trip
     let onVault: () -> Void
     let onEdit: () -> Void
+    let onManagePeople: () -> Void
     let onDelete: () -> Void
 
     @State private var showDeleteAlert = false
@@ -95,6 +101,11 @@ struct TripCard: View {
                     .font(.footnote).foregroundColor(Color(hex: "D1D5DB"))
                 Spacer()
                 HStack(spacing: 12) {
+                    Button { onManagePeople() } label: {
+                        Image(systemName: "person.2")
+                            .padding(6).background(Color.nostiaInput).cornerRadius(8)
+                            .foregroundColor(Color.nostiaTextSecond)
+                    }
                     Button { onEdit() } label: {
                         Image(systemName: "pencil")
                             .padding(6).background(Color.nostiaInput).cornerRadius(8)
@@ -217,5 +228,212 @@ struct EditTripSheet: View {
             }
         }
         .presentationBackground(Color.nostiaBackground)
+    }
+}
+
+struct ManageParticipantsSheet: View {
+    let initialTrip: Trip
+    let vm: TripsViewModel
+
+    @State private var currentTrip: Trip
+    @State private var friends: [Friend] = []
+    @State private var isLoadingFriends = false
+    @State private var actionLoadingId: Int? = nil
+    @State private var errorMessage: String?
+    @Environment(\.dismiss) private var dismiss
+
+    init(initialTrip: Trip, vm: TripsViewModel) {
+        self.initialTrip = initialTrip
+        self.vm = vm
+        _currentTrip = State(initialValue: initialTrip)
+    }
+
+    var participants: [TripParticipant] { currentTrip.participants ?? [] }
+    var participantUserIds: Set<Int> { Set(participants.map { $0.userId }) }
+    var friendsToAdd: [Friend] { friends.filter { !participantUserIds.contains($0.id) } }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Current participants
+                    Text("CURRENT PARTICIPANTS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.nostiaTextSecond)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 10)
+
+                    if participants.isEmpty {
+                        Text("No participants yet")
+                            .font(.footnote)
+                            .foregroundColor(Color.nostiaTextSecond)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 16)
+                    } else {
+                        ForEach(participants) { participant in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Color.nostiaAccent)
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Text(String((participant.name ?? "U").prefix(1)).uppercased())
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(participant.name ?? "Unknown")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    if let uname = participant.username {
+                                        Text("@\(uname)")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Color.nostiaTextSecond)
+                                    }
+                                }
+                                Spacer()
+                                if actionLoadingId == participant.userId {
+                                    ProgressView().tint(Color(hex: "EF4444"))
+                                } else {
+                                    Button {
+                                        Task { await handleRemove(userId: participant.userId) }
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                            .font(.title3)
+                                            .foregroundColor(Color(hex: "EF4444"))
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.nostiaCard)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                        }
+                    }
+
+                    // Add friends
+                    Text("ADD FRIENDS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.nostiaTextSecond)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 10)
+
+                    if isLoadingFriends {
+                        ProgressView()
+                            .tint(Color.nostiaAccent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    } else if friendsToAdd.isEmpty {
+                        Text("All friends are already on this trip")
+                            .font(.footnote)
+                            .foregroundColor(Color.nostiaTextSecond)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 16)
+                    } else {
+                        ForEach(friendsToAdd) { friend in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Color.nostiaSuccess)
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Text(friend.initial)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(friend.name)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    Text("@\(friend.username)")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color.nostiaTextSecond)
+                                }
+                                Spacer()
+                                if actionLoadingId == friend.id {
+                                    ProgressView().tint(.white)
+                                        .padding(.horizontal, 14).padding(.vertical, 8)
+                                        .background(Color.nostiaAccent)
+                                        .cornerRadius(8)
+                                } else {
+                                    Button {
+                                        Task { await handleAdd(friendId: friend.id) }
+                                    } label: {
+                                        Text("Add")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 14).padding(.vertical, 8)
+                                            .background(Color.nostiaAccent)
+                                            .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.nostiaCard)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                        }
+                    }
+
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(.footnote)
+                            .foregroundColor(Color(hex: "EF4444"))
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                    }
+
+                    Spacer(minLength: 32)
+                }
+            }
+            .background(Color.nostiaBackground)
+            .navigationTitle("Manage People")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.foregroundColor(Color.nostiaAccent)
+                }
+            }
+        }
+        .presentationBackground(Color.nostiaBackground)
+        .task { await loadFriends() }
+    }
+
+    private func loadFriends() async {
+        isLoadingFriends = true
+        do {
+            friends = try await FriendsAPI.shared.getAll()
+        } catch {}
+        isLoadingFriends = false
+    }
+
+    private func handleAdd(friendId: Int) async {
+        actionLoadingId = friendId
+        errorMessage = nil
+        let ok = await vm.addParticipant(tripId: currentTrip.id, userId: friendId)
+        if ok {
+            if let updated = vm.trips.first(where: { $0.id == currentTrip.id }) {
+                currentTrip = updated
+            }
+        } else {
+            errorMessage = vm.errorMessage
+        }
+        actionLoadingId = nil
+    }
+
+    private func handleRemove(userId: Int) async {
+        actionLoadingId = userId
+        errorMessage = nil
+        let ok = await vm.removeParticipant(tripId: currentTrip.id, userId: userId)
+        if ok {
+            if let updated = vm.trips.first(where: { $0.id == currentTrip.id }) {
+                currentTrip = updated
+            }
+        } else {
+            errorMessage = vm.errorMessage
+        }
+        actionLoadingId = nil
     }
 }
