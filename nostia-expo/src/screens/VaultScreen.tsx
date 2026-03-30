@@ -165,6 +165,9 @@ export default function VaultScreen({ route }: any) {
     );
   };
 
+  const isVaultLeader = vaultData?.currentUserId === vaultData?.vaultLeaderId;
+  const currentUserId = vaultData?.currentUserId;
+
   const renderExpenseCard = ({ item }: { item: any }) => (
     <View style={styles.expenseCard}>
       <View style={styles.expenseHeader}>
@@ -184,9 +187,11 @@ export default function VaultScreen({ route }: any) {
         <View style={styles.expenseAmount}>
           <Text style={styles.expenseTotalAmount}>${item.amount?.toFixed(2)}</Text>
           <Text style={styles.expenseCurrency}>{item.currency}</Text>
-          <TouchableOpacity onPress={() => handleDeleteEntry(item)} style={{ marginTop: 4 }}>
-            <Ionicons name="trash-outline" size={16} color="#EF4444" />
-          </TouchableOpacity>
+          {isVaultLeader && (
+            <TouchableOpacity onPress={() => handleDeleteEntry(item)} style={{ marginTop: 4 }}>
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -204,25 +209,43 @@ export default function VaultScreen({ route }: any) {
       {item.splits && item.splits.length > 0 && (
         <View style={styles.splitsContainer}>
           <Text style={styles.splitsTitle}>Splits:</Text>
-          {item.splits.map((split: any) => (
-            <View key={split.id} style={styles.splitItem}>
-              <Text style={styles.splitName}>{split.name}</Text>
-              <Text style={styles.splitAmount}>${split.amount?.toFixed(2)}</Text>
-              {!split.paid ? (
-                <TouchableOpacity
-                  style={styles.markPaidButton}
-                  onPress={() => handleMarkPaid(split.id)}
-                >
-                  <Text style={styles.markPaidText}>Confirm Settled</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.paidBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={styles.paidText}>Paid</Text>
-                </View>
-              )}
-            </View>
-          ))}
+          {item.splits.map((split: any) => {
+            const isMyOwnSplit = split.userId === currentUserId && item.paidBy !== currentUserId;
+            return (
+              <View key={split.id} style={styles.splitItem}>
+                <Text style={styles.splitName}>{split.name}</Text>
+                <Text style={styles.splitAmount}>${split.amount?.toFixed(2)}</Text>
+                {split.paid ? (
+                  <View style={styles.paidBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.paidText}>Paid</Text>
+                  </View>
+                ) : isMyOwnSplit ? (
+                  <TouchableOpacity
+                    style={[styles.payCardButton, payingId === split.id && styles.payCardButtonDisabled]}
+                    onPress={() => handlePayWithCard(split)}
+                    disabled={payingId !== null}
+                  >
+                    {payingId === split.id ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="card-outline" size={12} color="#FFFFFF" style={{ marginRight: 3 }} />
+                        <Text style={styles.payCardText}>Pay</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : isVaultLeader ? (
+                  <TouchableOpacity
+                    style={styles.markPaidButton}
+                    onPress={() => handleMarkPaid(split.id)}
+                  >
+                    <Text style={styles.markPaidText}>Settled</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       )}
     </View>
