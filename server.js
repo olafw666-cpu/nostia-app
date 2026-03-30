@@ -827,7 +827,11 @@ app.delete('/api/events/:id', authenticateToken, (req, res) => {
 // Get trip vault summary
 app.get('/api/vault/trip/:tripId', authenticateToken, (req, res) => {
   try {
+    const trip = Trip.findById(req.params.tripId);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
     const summary = Vault.getTripSummary(req.params.tripId, req.user.id);
+    summary.vaultLeaderId = trip.vaultLeaderId;
+    summary.currentUserId = req.user.id;
     res.json(summary);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -854,9 +858,15 @@ app.put('/api/vault/splits/:splitId/paid', authenticateToken, (req, res) => {
   }
 });
 
-// Delete vault entry
+// Delete vault entry — vault leader only
 app.delete('/api/vault/:id', authenticateToken, (req, res) => {
   try {
+    const entry = Vault.findById(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Expense not found' });
+    const trip = Trip.findById(entry.tripId);
+    if (!trip || trip.vaultLeaderId !== req.user.id) {
+      return res.status(403).json({ error: 'Only the vault leader can delete expenses' });
+    }
     Vault.deleteEntry(req.params.id);
     res.json({ message: 'Vault entry deleted' });
   } catch (error) {

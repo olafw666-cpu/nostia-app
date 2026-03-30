@@ -9,12 +9,13 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Image,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DeviceEventEmitter } from 'react-native';
-import { authAPI, tripsAPI, eventsAPI, friendsAPI } from '../services/api';
+import { authAPI, tripsAPI, eventsAPI, friendsAPI, feedAPI } from '../services/api';
 import { getCurrentLocation, requestLocationPermission, LocationData } from '../services/location';
 
 export default function HomeScreen() {
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const [trips, setTrips] = useState([]);
   const [events, setEvents] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [location, setLocation] = useState<LocationData | null>(null);
@@ -79,16 +81,18 @@ export default function HomeScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [userData, tripsData, eventsData, friendsData] = await Promise.all([
+      const [userData, tripsData, eventsData, friendsData, feedData] = await Promise.all([
         authAPI.getMe(),
         tripsAPI.getAll(),
         eventsAPI.getUpcoming(5),
         friendsAPI.getAll(),
+        feedAPI.getUserFeed(),
       ]);
       setUser(userData);
       setTrips(tripsData);
       setEvents(eventsData);
       setFriends(friendsData);
+      setFeed(feedData);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load home data');
     } finally {
@@ -309,6 +313,49 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Friend Feed */}
+      {feed.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Feed</Text>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('FeedTab')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {feed.slice(0, 5).map((post: any) => (
+            <View key={post.id} style={styles.feedCard}>
+              <View style={styles.feedHeader}>
+                <View style={styles.feedAvatar}>
+                  <Text style={styles.feedAvatarText}>{post.name?.charAt(0) || 'U'}</Text>
+                </View>
+                <View style={styles.feedMeta}>
+                  <Text style={styles.feedAuthor}>{post.name}</Text>
+                  <Text style={styles.feedTime}>
+                    {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+              {post.imageData && (
+                <Image source={{ uri: post.imageData }} style={styles.feedImage} resizeMode="cover" />
+              )}
+              {post.content ? (
+                <Text style={styles.feedContent} numberOfLines={3}>{post.content}</Text>
+              ) : null}
+              <View style={styles.feedFooter}>
+                <View style={styles.feedStat}>
+                  <Ionicons name="heart-outline" size={16} color="#9CA3AF" />
+                  <Text style={styles.feedStatText}>{post.likeCount || 0}</Text>
+                </View>
+                <View style={styles.feedStat}>
+                  <Ionicons name="chatbubble-outline" size={16} color="#9CA3AF" />
+                  <Text style={styles.feedStatText}>{post.commentCount || 0}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
     </ScrollView>
   );
 }
@@ -516,5 +563,70 @@ const styles = StyleSheet.create({
     fontSize: ms(12),
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  feedCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+    overflow: 'hidden',
+  },
+  feedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 10,
+  },
+  feedAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  feedAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: ms(14),
+  },
+  feedMeta: {
+    flex: 1,
+  },
+  feedAuthor: {
+    fontSize: ms(14),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  feedTime: {
+    fontSize: ms(12),
+    color: '#6B7280',
+  },
+  feedImage: {
+    width: '100%',
+    aspectRatio: 1,
+  },
+  feedContent: {
+    fontSize: ms(14),
+    color: '#D1D5DB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    lineHeight: 20,
+  },
+  feedFooter: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  feedStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  feedStatText: {
+    fontSize: ms(13),
+    color: '#9CA3AF',
   },
 });
