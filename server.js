@@ -827,9 +827,11 @@ app.delete('/api/events/:id', authenticateToken, (req, res) => {
 // Get trip vault summary
 app.get('/api/vault/trip/:tripId', authenticateToken, (req, res) => {
   try {
-    const trip = Trip.findById(req.params.tripId);
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
-    const summary = Vault.getTripSummary(req.params.tripId, req.user.id);
+    const tripId = parseInt(req.params.tripId, 10);
+    if (isNaN(tripId)) return res.status(400).json({ error: 'Invalid trip ID' });
+    const trip = Trip.findById(tripId);
+    if (!trip) return res.status(404).json({ error: `Trip ${tripId} not found` });
+    const summary = Vault.getTripSummary(tripId, req.user.id);
     summary.vaultLeaderId = trip.vaultLeaderId;
     summary.currentUserId = req.user.id;
     res.json(summary);

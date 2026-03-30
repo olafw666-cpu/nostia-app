@@ -20,17 +20,20 @@ class Trip {
   }
 
   static findById(id) {
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return null;
+
     const stmt = db.prepare(`
       SELECT t.*,
         u.username as creatorUsername, u.name as creatorName,
         vl.username as vaultLeaderUsername, vl.name as vaultLeaderName
       FROM trips t
-      INNER JOIN users u ON t.createdBy = u.id
+      LEFT JOIN users u ON t.createdBy = u.id
       LEFT JOIN users vl ON t.vaultLeaderId = vl.id
       WHERE t.id = ?
     `);
 
-    const trip = stmt.get(id);
+    const trip = stmt.get(numId);
 
     if (trip) {
       trip.participants = this.getParticipants(id);
@@ -61,13 +64,13 @@ class Trip {
     const stmt = db.prepare(`
       SELECT DISTINCT t.*, u.username as creatorUsername, u.name as creatorName
       FROM trips t
-      INNER JOIN users u ON t.createdBy = u.id
+      LEFT JOIN users u ON t.createdBy = u.id
       INNER JOIN trip_participants tp ON t.id = tp.tripId
       WHERE tp.userId = ?
       ORDER BY t.createdAt DESC
     `);
 
-    const trips = stmt.all(userId);
+    const trips = stmt.all(parseInt(userId, 10));
 
     trips.forEach(trip => {
       trip.participants = this.getParticipants(trip.id);
