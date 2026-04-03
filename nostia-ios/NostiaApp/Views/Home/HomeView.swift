@@ -90,6 +90,14 @@ struct HomeView: View {
                         EventPreviewCard(event: event)
                     }
                 }
+
+                // Recent feed posts
+                if !vm.feed.isEmpty {
+                    SectionHeader(title: "Recent Posts")
+                    ForEach(vm.feed.prefix(3)) { post in
+                        FeedPreviewCard(post: post)
+                    }
+                }
             }
             .padding(16)
             .padding(.bottom, 40)
@@ -185,6 +193,35 @@ struct EventPreviewCard: View {
             Text(event.formattedDate).font(.footnote.bold()).foregroundColor(Color.nostiaWarning)
         }
         .padding(16)
+        .background(Color.nostiaCard)
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+    }
+}
+
+struct FeedPreviewCard: View {
+    let post: FeedPost
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                AvatarView(name: post.name, size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(post.name).font(.subheadline.bold()).foregroundColor(.white)
+                    Text(post.timeAgo).font(.caption).foregroundColor(Color.nostiaTextMuted)
+                }
+                Spacer()
+                HStack(spacing: 10) {
+                    Label("\(post.likeCount)", systemImage: "heart")
+                        .font(.caption).foregroundColor(Color.nostiaTextMuted)
+                    Label("\(post.commentCount)", systemImage: "bubble.right")
+                        .font(.caption).foregroundColor(Color.nostiaTextMuted)
+                }
+            }
+            if let content = post.content, !content.isEmpty {
+                Text(content).font(.subheadline).foregroundColor(Color.nostiaTextSecond).lineLimit(2)
+            }
+        }
+        .padding(14)
         .background(Color.nostiaCard)
         .cornerRadius(12)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))

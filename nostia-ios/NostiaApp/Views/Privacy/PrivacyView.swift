@@ -24,6 +24,20 @@ struct PrivacyView: View {
                                 SettingsRow(icon: "envelope.fill", label: "Email", value: email)
                             }
                         }
+                        NavigationLink {
+                            PaymentMethodsView()
+                                .navigationTitle("Payment Methods")
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            HStack {
+                                Image(systemName: "creditcard.fill").foregroundColor(Color.nostiaAccent).frame(width: 24)
+                                Text("Payment Methods").foregroundColor(.white)
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundColor(Color.nostiaTextSecond)
+                            }
+                            .font(.subheadline).padding(16)
+                            .overlay(Divider().background(Color.nostriaBorder), alignment: .bottom)
+                        }
                     }
 
                     // Privacy & Consent section

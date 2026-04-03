@@ -39,6 +39,15 @@ final class APIClient {
             throw APIError.httpError(statusCode: 401, message: "Session expired. Please log in again.")
         }
 
+        if http.statusCode == 403 {
+            let errMsg = (try? JSONDecoder().decode(APIErrorResponse.self, from: data))?.error ?? ""
+            if errMsg == "Invalid or expired token" {
+                AuthManager.shared.logout()
+                throw APIError.httpError(statusCode: 403, message: "Session expired. Please log in again.")
+            }
+            throw APIError.httpError(statusCode: 403, message: errMsg.isEmpty ? "Access denied" : errMsg)
+        }
+
         guard (200..<300).contains(http.statusCode) else {
             let msg = (try? JSONDecoder().decode(APIErrorResponse.self, from: data))?.error ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw APIError.httpError(statusCode: http.statusCode, message: msg)
@@ -78,6 +87,11 @@ final class APIClient {
         guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
 
         if http.statusCode == 401 { AuthManager.shared.logout(); return }
+        if http.statusCode == 403 {
+            let errMsg = (try? JSONDecoder().decode(APIErrorResponse.self, from: data))?.error ?? ""
+            if errMsg == "Invalid or expired token" { AuthManager.shared.logout() }
+            return
+        }
 
         guard (200..<300).contains(http.statusCode) else {
             let msg = (try? JSONDecoder().decode(APIErrorResponse.self, from: data))?.error ?? "Request failed"

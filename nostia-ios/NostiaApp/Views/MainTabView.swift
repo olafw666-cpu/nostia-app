@@ -5,6 +5,7 @@ struct MainTabView: View {
     @State private var unreadCount = 0
     @State private var showNotifications = false
     @State private var showSettings = false
+    @State private var showAnalytics = false
     @State private var userRole: String = "user"
 
     var body: some View {
@@ -23,8 +24,17 @@ struct MainTabView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
             }
-            .tabItem { Label("Trips", systemImage: selectedTab == 1 ? "airplane" : "airplane") }
+            .tabItem { Label("Trips", systemImage: "airplane") }
             .tag(1)
+
+            NavigationStack {
+                FeedView()
+                    .navigationTitle("Feed")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { tabBarToolbar }
+            }
+            .tabItem { Label("Feed", systemImage: selectedTab == 2 ? "photo.on.rectangle.angled.fill" : "photo.on.rectangle.angled") }
+            .tag(2)
 
             NavigationStack {
                 AdventuresView()
@@ -32,8 +42,8 @@ struct MainTabView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
             }
-            .tabItem { Label("Discover", systemImage: selectedTab == 2 ? "safari.fill" : "safari") }
-            .tag(2)
+            .tabItem { Label("Discover", systemImage: selectedTab == 3 ? "safari.fill" : "safari") }
+            .tag(3)
 
             NavigationStack {
                 FriendsView()
@@ -41,8 +51,8 @@ struct MainTabView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
             }
-            .tabItem { Label("Friends", systemImage: selectedTab == 3 ? "person.2.fill" : "person.2") }
-            .tag(3)
+            .tabItem { Label("Friends", systemImage: selectedTab == 4 ? "person.2.fill" : "person.2") }
+            .tag(4)
 
             NavigationStack {
                 FriendsMapView()
@@ -50,8 +60,8 @@ struct MainTabView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
             }
-            .tabItem { Label("Map", systemImage: selectedTab == 4 ? "map.fill" : "map") }
-            .tag(4)
+            .tabItem { Label("Map", systemImage: selectedTab == 5 ? "map.fill" : "map") }
+            .tag(5)
         }
         .tint(Color.nostiaAccent)
         .onAppear {
@@ -59,6 +69,7 @@ struct MainTabView: View {
             UITabBar.appearance().backgroundColor = UIColor(Color.nostiaCard)
             UITabBar.appearance().unselectedItemTintColor = UIColor(Color.nostiaTextMuted)
             loadUnreadCount()
+            loadUserRole()
         }
         .sheet(isPresented: $showNotifications) {
             NavigationStack {
@@ -81,6 +92,25 @@ struct MainTabView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Close") { showSettings = false }
+                                .foregroundColor(Color.nostiaAccent)
+                        }
+                        if userRole == "admin" {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Analytics") { showAnalytics = true }
+                                    .foregroundColor(Color.nostiaAccent)
+                            }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showAnalytics) {
+            NavigationStack {
+                AnalyticsView()
+                    .navigationTitle("Analytics")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close") { showAnalytics = false }
                                 .foregroundColor(Color.nostiaAccent)
                         }
                     }
@@ -121,6 +151,13 @@ struct MainTabView: View {
         Task {
             let count = try? await NotificationsAPI.shared.getUnreadCount()
             await MainActor.run { unreadCount = count ?? 0 }
+        }
+    }
+
+    func loadUserRole() {
+        Task {
+            let user = try? await AuthAPI.shared.getMe()
+            await MainActor.run { userRole = user?.role ?? "user" }
         }
     }
 }
