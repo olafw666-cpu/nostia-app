@@ -8,26 +8,30 @@ final class HomeViewModel: ObservableObject {
     @Published var upcomingEvents: [Event] = []
     @Published var nearbyEvents: [Event] = []
     @Published var friends: [Friend] = []
+    @Published var feed: [FeedPost] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     func loadAll() async {
         isLoading = true
         errorMessage = nil
-        async let userData = AuthAPI.shared.getMe()
-        async let tripsData = TripsAPI.shared.getAll()
-        async let eventsData = AdventuresAPI.shared.getUpcomingEvents(limit: 5)
-        async let friendsData = FriendsAPI.shared.getAll()
-
+        // Load user first — failure means session is invalid
         do {
-            let (u, t, e, f) = try await (userData, tripsData, eventsData, friendsData)
-            user = u
-            trips = t
-            upcomingEvents = e
-            friends = f
+            user = try await AuthAPI.shared.getMe()
         } catch {
-            errorMessage = error.localizedDescription
+            AuthManager.shared.logout()
+            isLoading = false
+            return
         }
+        // Load the rest concurrently, ignoring individual failures
+        async let t = TripsAPI.shared.getAll()
+        async let e = AdventuresAPI.shared.getUpcomingEvents(limit: 5)
+        async let f = FriendsAPI.shared.getAll()
+        async let fd = FeedAPI.shared.getUserFeed(limit: 5)
+        trips = (try? await t) ?? []
+        upcomingEvents = (try? await e) ?? []
+        friends = (try? await f) ?? []
+        feed = (try? await fd) ?? []
         isLoading = false
     }
 
