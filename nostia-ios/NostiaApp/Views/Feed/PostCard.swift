@@ -11,7 +11,7 @@ struct PostCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: 10) {
-                AvatarView(name: post.name, size: 40)
+                AvatarView(initial: String(post.name.prefix(1)).uppercased(), color: Color.nostiaAccent, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(post.name).font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
                     Text("@\(post.username) · \(post.timeAgo)")
@@ -52,7 +52,7 @@ struct PostCard: View {
                     .padding(.horizontal, 14).padding(.bottom, 8)
             }
 
-            Divider().background(Color.nostriaBorder).padding(.horizontal, 14)
+            Divider().background(Color.white.opacity(0.1)).padding(.horizontal, 14)
 
             // Footer
             HStack(spacing: 20) {
@@ -69,8 +69,6 @@ struct PostCard: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
         }
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 18))
     }
 }

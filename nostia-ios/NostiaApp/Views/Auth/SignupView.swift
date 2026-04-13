@@ -16,12 +16,19 @@ struct SignupView: View {
             VStack(spacing: 0) {
                 LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .frame(maxWidth: .infinity).frame(height: 220)
+                    .frame(maxWidth: .infinity).frame(height: 240)
                     .overlay {
                         VStack(spacing: 12) {
-                            Image(systemName: "safari.fill").font(.system(size: 64)).foregroundColor(.white)
-                            Text("Join Nostia").font(.system(size: 32, weight: .bold)).foregroundColor(.white)
-                            Text("Start your adventure today").font(.subheadline).foregroundColor(Color(hex: "E0E7FF"))
+                            Image(systemName: "safari.fill")
+                                .font(.system(size: 64))
+                                .foregroundColor(.white)
+                                .shadow(color: .white.opacity(0.3), radius: 20)
+                            Text("Join Nostia")
+                                .font(.system(size: 34, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("Start your adventure today")
+                                .font(.subheadline)
+                                .foregroundColor(Color(hex: "E0E7FF"))
                         }
                     }
 
@@ -29,7 +36,9 @@ struct SignupView: View {
                     if let err = vm.errorMessage {
                         Text(err).font(.footnote).foregroundColor(Color.nostriaDanger)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12).background(Color.nostriaDanger.opacity(0.15)).cornerRadius(8)
+                            .padding(12)
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.nostriaDanger.opacity(0.5), lineWidth: 1))
                     }
 
                     NostiaTextField(label: "Full Name *", placeholder: "Enter your name", text: $name)
@@ -49,7 +58,9 @@ struct SignupView: View {
                             Text("Privacy consent granted").font(.subheadline).foregroundColor(Color.nostiaSuccess)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12).background(Color.nostiaSuccess.opacity(0.1)).cornerRadius(8)
+                        .padding(12)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.nostiaSuccess.opacity(0.4), lineWidth: 1))
                     }
 
                     Button {
@@ -71,7 +82,8 @@ struct SignupView: View {
                         .frame(maxWidth: .infinity).padding(18)
                         .background(LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
                                                    startPoint: .leading, endPoint: .trailing))
-                        .cornerRadius(12)
+                        .cornerRadius(16)
+                        .shadow(color: Color.nostiaAccent.opacity(0.4), radius: 12, y: 6)
                     }
                     .disabled(vm.isLoading)
 
@@ -88,7 +100,7 @@ struct SignupView: View {
                 .padding(24)
             }
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .navigationBarHidden(true)
         .sheet(isPresented: $showConsent) {
             ConsentSheet(

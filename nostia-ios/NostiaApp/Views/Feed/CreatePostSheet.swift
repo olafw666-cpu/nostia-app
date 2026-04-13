@@ -13,7 +13,7 @@ struct CreatePostSheet: View {
                     TextField("What's on your mind?", text: $vm.newPostContent, axis: .vertical)
                         .lineLimit(4...10)
                         .padding(14)
-                        .background(Color.nostiaInput).cornerRadius(12)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 14))
                         .foregroundColor(.white)
 
                     // Photo preview
@@ -24,7 +24,7 @@ struct CreatePostSheet: View {
                             Image(uiImage: uiImage)
                                 .resizable().scaledToFill()
                                 .frame(maxWidth: .infinity).frame(height: 180)
-                                .clipped().cornerRadius(12)
+                                .clipped().cornerRadius(14)
                             Button {
                                 vm.newPostImageData = nil
                                 selectedPhoto = nil
@@ -42,14 +42,11 @@ struct CreatePostSheet: View {
                             .foregroundColor(Color.nostiaAccent)
                             .frame(maxWidth: .infinity)
                             .padding(14)
-                            .background(Color.nostiaCard)
-                            .cornerRadius(12)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 14))
                     }
                     .onChange(of: selectedPhoto) { item in
                         Task {
                             if let data = try? await item?.loadTransferable(type: Data.self) {
-                                // Compress and convert to base64
                                 let img = UIImage(data: data)
                                 let compressed = img?.jpegData(compressionQuality: 0.6) ?? data
                                 vm.newPostImageData = compressed.base64EncodedString()
@@ -59,9 +56,10 @@ struct CreatePostSheet: View {
                 }
                 .padding(16)
             }
-            .background(Color.nostiaBackground)
+            .background(.clear)
             .navigationTitle("New Post")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -86,5 +84,6 @@ struct CreatePostSheet: View {
                 }
             }
         }
+        .presentationBackground(.ultraThinMaterial)
     }
 }

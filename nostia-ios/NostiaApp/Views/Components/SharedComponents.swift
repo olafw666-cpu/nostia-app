@@ -12,8 +12,10 @@ struct AvatarView: View {
             .font(.system(size: size * 0.4, weight: .bold))
             .foregroundColor(.white)
             .frame(width: size, height: size)
-            .background(color)
+            .background(color.opacity(0.85))
             .clipShape(Circle())
+            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
+            .shadow(color: color.opacity(0.45), radius: size * 0.18)
     }
 }
 
@@ -25,7 +27,7 @@ struct LoadingView: View {
             ProgressView().tint(Color.nostiaAccent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.nostiaBackground)
+        .background(.clear)
     }
 }
 
@@ -37,17 +39,21 @@ struct EmptyStateView: View {
     let sub: String
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(Color.nostiaTextSecond)
+                .font(.system(size: 56))
+                .foregroundStyle(Color.nostiaAccent.opacity(0.7))
             Text(text).font(.title3.bold()).foregroundColor(.white)
             if !sub.isEmpty {
-                Text(sub).font(.subheadline).foregroundColor(Color.nostiaTextSecond)
+                Text(sub)
+                    .font(.subheadline)
+                    .foregroundColor(Color.nostiaTextSecond)
+                    .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+        .padding(.horizontal, 32)
     }
 }
 
@@ -64,7 +70,7 @@ struct ConsentSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 20) {
                     Text("Before you join Nostia, we need your consent to use certain features.")
                         .font(.subheadline).foregroundColor(Color.nostiaTextSecond)
 
@@ -96,7 +102,11 @@ struct ConsentSheet: View {
                             }
                             .font(.headline).foregroundColor(.white)
                             .frame(maxWidth: .infinity).padding(16)
-                            .background(Color.nostiaAccent).cornerRadius(12)
+                            .background(
+                                LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
+                                               startPoint: .leading, endPoint: .trailing)
+                            )
+                            .cornerRadius(14)
                         }
 
                         Button {
@@ -105,17 +115,18 @@ struct ConsentSheet: View {
                             Text("Decline")
                                 .font(.headline).foregroundColor(Color.nostiaTextSecond)
                                 .frame(maxWidth: .infinity).padding(16)
-                                .background(Color.nostiaInput).cornerRadius(12)
+                                .glassEffect(in: RoundedRectangle(cornerRadius: 14))
                         }
                     }
                 }
                 .padding(24)
             }
-            .background(Color.nostiaBackground)
+            .background(.clear)
             .navigationTitle("Privacy Consent")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
         }
-        .presentationBackground(Color.nostiaBackground)
+        .presentationBackground(.ultraThinMaterial)
     }
 }
 
@@ -136,15 +147,13 @@ struct ConsentToggle: View {
             Text(description).font(.footnote).foregroundColor(Color.nostiaTextSecond)
         }
         .padding(16)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
 // MARK: - Date helpers (used by trip sheets)
 
-private func formatTripDate(_ raw: String) -> String {
+func formatTripDate(_ raw: String) -> String {
     let digits = String(raw.filter { $0.isNumber }.prefix(8))
     switch digits.count {
     case 0...4: return digits
@@ -154,7 +163,7 @@ private func formatTripDate(_ raw: String) -> String {
     }
 }
 
-private func isValidTripDate(_ value: String) -> Bool {
+func isValidTripDate(_ value: String) -> Bool {
     guard value.count == 10 else { return false }
     let parts = value.split(separator: "-")
     guard parts.count == 3,
@@ -199,26 +208,29 @@ struct CreateTripSheet: View {
                             if formatted != newValue { endDate = formatted }
                         }
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Description").font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color(hex: "D1D5DB"))
+                        Text("Description")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
                         TextEditor(text: $description)
                             .frame(minHeight: 80).padding(12)
-                            .background(Color.nostiaCard).cornerRadius(12)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
                             .foregroundColor(.white).scrollContentBackground(.hidden)
                     }
                     if let err = validationError {
                         Text(err)
                             .font(.footnote)
-                            .foregroundColor(.red)
+                            .foregroundColor(Color.nostriaDanger)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
                 .padding(20)
             }
-            .background(Color.nostiaBackground)
+            .background(.clear)
             .navigationTitle("Create Trip")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }.foregroundColor(Color.nostiaAccent)
@@ -251,7 +263,7 @@ struct CreateTripSheet: View {
                 }
             }
         }
-        .presentationBackground(Color.nostiaBackground)
+        .presentationBackground(.ultraThinMaterial)
     }
 }
 
@@ -277,19 +289,23 @@ struct CreateExpenseSheet: View {
                     NostiaTextField(label: "Description *", placeholder: "What was this for?", text: $description)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Amount *").font(.system(size: 14, weight: .semibold)).foregroundColor(Color(hex: "D1D5DB"))
+                        Text("Amount *")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
                         HStack {
                             Text("$").foregroundColor(Color.nostiaTextSecond).font(.title3)
                             TextField("0.00", text: $amountText).keyboardType(.decimalPad).foregroundColor(.white)
                         }
-                        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                        .padding(16)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
                     }
 
                     NostiaTextField(label: "Date *", placeholder: "YYYY-MM-DD", text: $dateText)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Category").font(.system(size: 14, weight: .semibold)).foregroundColor(Color(hex: "D1D5DB"))
+                        Text("Category")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(categories, id: \.self) { cat in
@@ -301,9 +317,10 @@ struct CreateExpenseSheet: View {
                 }
                 .padding(20)
             }
-            .background(Color.nostiaBackground)
+            .background(.clear)
             .navigationTitle("Add Expense")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }.foregroundColor(Color.nostiaAccent)
@@ -324,10 +341,26 @@ struct CreateExpenseSheet: View {
                 }
             }
         }
-        .presentationBackground(Color.nostiaBackground)
+        .presentationBackground(.ultraThinMaterial)
         .onAppear {
             let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
             dateText = fmt.string(from: Date())
+        }
+    }
+}
+
+// MARK: - Filter Chip (shared across Adventures and Vault)
+
+struct FilterChip: View {
+    let title: String; let isActive: Bool; let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.bold())
+                .foregroundColor(isActive ? .white : Color.nostiaTextSecond)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .glassEffect(in: Capsule())
+                .overlay(isActive ? Capsule().stroke(Color.nostiaAccent, lineWidth: 1) : nil)
         }
     }
 }

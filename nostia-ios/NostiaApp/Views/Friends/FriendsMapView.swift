@@ -17,14 +17,12 @@ struct FriendsMapView: View {
                         VStack(spacing: 4) {
                             AvatarView(initial: String(friend.name.prefix(1)).uppercased(),
                                        color: Color.nostiaAccent, size: 36)
-                                .overlay(
-                                    Circle().stroke(Color.white, lineWidth: 2)
-                                )
-                                .shadow(radius: 4)
+                                .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 2))
+                                .shadow(color: Color.nostiaAccent.opacity(0.5), radius: 8)
                             Text(friend.name.components(separatedBy: " ").first ?? friend.name)
                                 .font(.caption.bold()).foregroundColor(.white)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.nostiaAccent).cornerRadius(8)
+                                .glassEffect(in: Capsule())
                         }
                     }
                 }
@@ -33,18 +31,20 @@ struct FriendsMapView: View {
 
             if isLoading {
                 ProgressView().tint(Color.nostiaAccent)
-                    .padding(16).background(Color.nostiaCard).cornerRadius(12)
+                    .padding(16)
+                    .glassEffect(in: RoundedRectangle(cornerRadius: 12))
             }
 
             if !isLoading && friendLocations.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "map").font(.system(size: 48)).foregroundColor(Color.nostiaTextSecond)
+                    Image(systemName: "map").font(.system(size: 48)).foregroundColor(Color.nostiaAccent.opacity(0.8))
                     Text("No friend locations").font(.headline).foregroundColor(.white)
                     Text("Friends who share their location will appear here")
                         .font(.footnote).foregroundColor(Color.nostiaTextSecond)
                         .multilineTextAlignment(.center)
                 }
-                .padding(24).background(Color.nostiaCard.opacity(0.9)).cornerRadius(16)
+                .padding(24)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 20))
                 .padding()
             }
         }

@@ -3,7 +3,8 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 // Initialize SQLite database
-const db = new Database(path.join(__dirname, 'nostia.db'));
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'nostia.db');
+const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
