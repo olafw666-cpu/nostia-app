@@ -16,18 +16,19 @@ struct PrivacyView: View {
                     ProgressView().tint(Color.nostiaAccent).padding(40)
                 } else {
                     // Account section
-                    SettingsSection(title: "Account") {
+                    GlassSection(title: "Account") {
                         if let u = user {
-                            SettingsRow(icon: "person.fill", label: "Name", value: u.name)
-                            SettingsRow(icon: "at", label: "Username", value: "@\(u.username)")
+                            GlassRow(icon: "person.fill", label: "Name", value: u.name)
+                            GlassRow(icon: "at", label: "Username", value: "@\(u.username)")
                             if let email = u.email, !email.isEmpty {
-                                SettingsRow(icon: "envelope.fill", label: "Email", value: email)
+                                GlassRow(icon: "envelope.fill", label: "Email", value: email)
                             }
                         }
                         NavigationLink {
                             PaymentMethodsView()
                                 .navigationTitle("Payment Methods")
                                 .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(.hidden, for: .navigationBar)
                         } label: {
                             HStack {
                                 Image(systemName: "creditcard.fill").foregroundColor(Color.nostiaAccent).frame(width: 24)
@@ -36,24 +37,22 @@ struct PrivacyView: View {
                                 Image(systemName: "chevron.right").foregroundColor(Color.nostiaTextSecond)
                             }
                             .font(.subheadline).padding(16)
-                            .overlay(Divider().background(Color.nostriaBorder), alignment: .bottom)
+                            .overlay(Divider().background(Color.white.opacity(0.08)), alignment: .bottom)
                         }
                     }
 
                     // Privacy & Consent section
-                    SettingsSection(title: "Privacy & Consent") {
-                        SettingsRow(icon: "location.fill",
-                                    label: "Location Consent",
-                                    value: consentStatus?.locationConsent == true ? "Granted" : "Not granted",
-                                    valueColor: consentStatus?.locationConsent == true ? Color.nostiaSuccess : Color.nostriaDanger)
-                        SettingsRow(icon: "chart.bar.fill",
-                                    label: "Data Collection",
-                                    value: consentStatus?.dataCollectionConsent == true ? "Granted" : "Not granted",
-                                    valueColor: consentStatus?.dataCollectionConsent == true ? Color.nostiaSuccess : Color.nostriaDanger)
+                    GlassSection(title: "Privacy & Consent") {
+                        GlassRow(icon: "location.fill",
+                                 label: "Location Consent",
+                                 value: consentStatus?.locationConsent == true ? "Granted" : "Not granted",
+                                 valueColor: consentStatus?.locationConsent == true ? Color.nostiaSuccess : Color.nostriaDanger)
+                        GlassRow(icon: "chart.bar.fill",
+                                 label: "Data Collection",
+                                 value: consentStatus?.dataCollectionConsent == true ? "Granted" : "Not granted",
+                                 valueColor: consentStatus?.dataCollectionConsent == true ? Color.nostiaSuccess : Color.nostriaDanger)
 
-                        Button {
-                            showRevokeAlert = true
-                        } label: {
+                        Button { showRevokeAlert = true } label: {
                             HStack {
                                 Image(systemName: "xmark.shield").foregroundColor(Color.nostriaDanger)
                                 Text("Revoke All Consent").foregroundColor(Color.nostriaDanger)
@@ -65,10 +64,8 @@ struct PrivacyView: View {
                     }
 
                     // Data section
-                    SettingsSection(title: "Your Data") {
-                        Button {
-                            Task { await requestDataExport() }
-                        } label: {
+                    GlassSection(title: "Your Data") {
+                        Button { Task { await requestDataExport() } } label: {
                             HStack {
                                 Image(systemName: "square.and.arrow.down").foregroundColor(Color.nostiaAccent)
                                 Text("Request Data Export").foregroundColor(.white)
@@ -78,9 +75,7 @@ struct PrivacyView: View {
                             .padding(16)
                         }
 
-                        Button {
-                            showDeleteAlert = true
-                        } label: {
+                        Button { showDeleteAlert = true } label: {
                             HStack {
                                 Image(systemName: "trash.fill").foregroundColor(Color.nostriaDanger)
                                 Text("Delete My Data").foregroundColor(Color.nostriaDanger)
@@ -92,9 +87,7 @@ struct PrivacyView: View {
                     }
 
                     // Logout
-                    Button {
-                        authManager.logout()
-                    } label: {
+                    Button { authManager.logout() } label: {
                         HStack {
                             Spacer()
                             Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -103,19 +96,22 @@ struct PrivacyView: View {
                         }
                         .font(.headline).foregroundColor(.white)
                         .padding(16)
-                        .background(Color.nostriaDanger).cornerRadius(12)
+                        .background(Color.nostriaDanger).cornerRadius(14)
+                        .shadow(color: Color.nostriaDanger.opacity(0.4), radius: 10, y: 5)
                     }
 
                     if let msg = message {
                         Text(msg).font(.footnote).foregroundColor(Color.nostiaSuccess)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12).background(Color.nostiaSuccess.opacity(0.1)).cornerRadius(8)
+                            .padding(12)
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.nostiaSuccess.opacity(0.4), lineWidth: 1))
                     }
                 }
             }
             .padding(16).padding(.bottom, 40)
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .task { await loadData() }
         .alert("Revoke Consent", isPresented: $showRevokeAlert) {
             Button("Cancel", role: .cancel) {}
@@ -136,8 +132,7 @@ struct PrivacyView: View {
         async let userData = AuthAPI.shared.getMe()
         async let consentData: ConsentStatus? = try? APIClient.shared.request("/consent")
         let (u, c) = await (try? userData, await consentData)
-        user = u
-        consentStatus = c
+        user = u; consentStatus = c
         isLoading = false
     }
 
@@ -163,25 +158,27 @@ struct ConsentStatus: Decodable {
     let dataCollectionConsent: Bool?
 }
 
-struct SettingsSection<Content: View>: View {
+// MARK: - Glass Settings Components
+
+struct GlassSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.footnote.bold()).foregroundColor(Color.nostiaTextSecond)
-                .padding(.horizontal, 16).padding(.bottom, 6)
+            Text(title)
+                .font(.footnote.bold())
+                .foregroundColor(Color.nostiaTextSecond)
+                .padding(.horizontal, 4).padding(.bottom, 6)
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.nostiaCard)
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         }
     }
 }
 
-struct SettingsRow: View {
+struct GlassRow: View {
     let icon: String
     let label: String
     let value: String
@@ -196,6 +193,6 @@ struct SettingsRow: View {
         }
         .font(.subheadline)
         .padding(16)
-        .overlay(Divider().background(Color.nostriaBorder), alignment: .bottom)
+        .overlay(Divider().background(Color.white.opacity(0.08)), alignment: .bottom)
     }
 }

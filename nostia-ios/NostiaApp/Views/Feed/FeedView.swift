@@ -11,7 +11,7 @@ struct FeedView: View {
                     ProgressView().tint(Color.nostiaAccent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if vm.posts.isEmpty {
-                    EmptyStateView(icon: "photo.on.rectangle.angled", title: "No posts yet", subtitle: "Be the first to share something!")
+                    EmptyStateView(icon: "photo.on.rectangle.angled", text: "No posts yet", sub: "Be the first to share something!")
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -30,7 +30,7 @@ struct FeedView: View {
                     .refreshable { await vm.loadFeed() }
                 }
             }
-            .background(Color.nostiaBackground)
+            .background(.clear)
 
             // FAB
             Button { vm.showCreateSheet = true } label: {
@@ -42,7 +42,7 @@ struct FeedView: View {
                                        startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: Color.nostiaAccent.opacity(0.5), radius: 12, y: 6)
             }
             .padding(.trailing, 20).padding(.bottom, 20)
         }

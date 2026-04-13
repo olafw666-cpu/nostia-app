@@ -12,27 +12,35 @@ struct HomeView: View {
                 // Welcome header
                 LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .cornerRadius(16)
-                    .frame(height: 140)
+                    .cornerRadius(20)
+                    .frame(height: 150)
                     .overlay {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Welcome back,").font(.subheadline).foregroundColor(Color(hex: "E0E7FF"))
+                                Text("Welcome back,")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color(hex: "E0E7FF"))
                                 Text(vm.user?.name ?? "Adventurer")
-                                    .font(.system(size: 28, weight: .bold)).foregroundColor(.white)
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.white)
                                 Text("Your next adventure awaits")
-                                    .font(.subheadline).foregroundColor(Color(hex: "E0E7FF"))
+                                    .font(.subheadline)
+                                    .foregroundColor(Color(hex: "E0E7FF"))
                             }
                             Spacer()
                             Button {
                                 showLogoutAlert = true
                             } label: {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .font(.title2).foregroundColor(.white).padding(8)
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .padding(10)
+                                    .glassEffect(in: Circle())
                             }
                         }
                         .padding(20)
                     }
+                    .shadow(color: Color.nostiaAccent.opacity(0.35), radius: 20, y: 8)
 
                 // Home status card
                 VStack(alignment: .leading, spacing: 8) {
@@ -46,8 +54,13 @@ struct HomeView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 16).padding(.vertical, 8)
-                                .background(vm.user?.isHomeOpen == true ? Color(hex: "065F46") : Color.nostiaInput)
-                                .cornerRadius(20)
+                                .glassEffect(in: Capsule())
+                                .overlay(
+                                    Capsule().stroke(
+                                        vm.user?.isHomeOpen == true ? Color.nostiaSuccess : Color.nostriaBorder,
+                                        lineWidth: 1
+                                    )
+                                )
                         }
                     }
                     Text(vm.user?.isHomeOpen == true
@@ -56,9 +69,7 @@ struct HomeView: View {
                         .font(.footnote).foregroundColor(Color.nostiaTextSecond)
                 }
                 .padding(16)
-                .background(Color.nostiaCard)
-                .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                .glassEffect(in: RoundedRectangle(cornerRadius: 16))
 
                 // Quick stats
                 HStack(spacing: 12) {
@@ -102,7 +113,7 @@ struct HomeView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .refreshable { await vm.loadAll() }
         .navigationTitle("Nostia")
         .navigationBarTitleDisplayMode(.inline)
@@ -135,9 +146,7 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -168,9 +177,7 @@ struct TripPreviewCard: View {
             Text(trip.formattedDates).font(.footnote.bold()).foregroundColor(Color.nostiaAccent)
         }
         .padding(16)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -193,9 +200,7 @@ struct EventPreviewCard: View {
             Text(event.formattedDate).font(.footnote.bold()).foregroundColor(Color.nostiaWarning)
         }
         .padding(16)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -204,7 +209,7 @@ struct FeedPreviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                AvatarView(name: post.name, size: 32)
+                AvatarView(initial: String(post.name.prefix(1)).uppercased(), color: Color.nostiaAccent, size: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(post.name).font(.subheadline.bold()).foregroundColor(.white)
                     Text(post.timeAgo).font(.caption).foregroundColor(Color.nostiaTextMuted)
@@ -222,8 +227,6 @@ struct FeedPreviewCard: View {
             }
         }
         .padding(14)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }

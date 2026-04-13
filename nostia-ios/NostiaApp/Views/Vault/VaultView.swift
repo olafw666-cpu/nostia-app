@@ -22,18 +22,19 @@ struct VaultView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Total Expenses").font(.footnote).foregroundColor(Color.nostiaTextSecond)
                                 Text(String(format: "$%.2f", total))
-                                    .font(.system(size: 32, weight: .bold)).foregroundColor(.white)
+                                    .font(.system(size: 34, weight: .bold)).foregroundColor(.white)
                             }
                             Spacer()
                             Button { showAddExpense = true } label: {
                                 Label("Add Expense", systemImage: "plus")
                                     .font(.subheadline.bold()).foregroundColor(.white)
                                     .padding(.horizontal, 16).padding(.vertical, 10)
-                                    .background(Color.nostiaAccent).cornerRadius(10)
+                                    .background(Color.nostiaAccent).cornerRadius(12)
+                                    .shadow(color: Color.nostiaAccent.opacity(0.4), radius: 8)
                             }
                         }
-                        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                        .padding(16)
+                        .glassEffect(in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     // Balances
@@ -52,13 +53,9 @@ struct VaultView: View {
                         ForEach(data.entries) { entry in
                             ExpenseCard(
                                 entry: entry,
-                                onDelete: { Task {
-                                    await vm.deleteEntry(entry.id, tripId: tripId)
-                                }},
+                                onDelete: { Task { await vm.deleteEntry(entry.id, tripId: tripId) } },
                                 onMarkPaid: { splitId in confirmPaySplitId = splitId },
-                                onPayWithCard: { splitId in
-                                    Task { await vm.preparePaymentSheet(splitId: splitId) }
-                                },
+                                onPayWithCard: { splitId in Task { await vm.preparePaymentSheet(splitId: splitId) } },
                                 payingId: vm.payingId
                             )
                         }
@@ -71,9 +68,10 @@ struct VaultView: View {
             }
             .padding(16).padding(.bottom, 40)
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .navigationTitle(tripTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .refreshable { await vm.loadVault(tripId: tripId) }
         .task { await vm.loadVault(tripId: tripId) }
         .alert("Error", isPresented: Binding(get: { vm.errorMessage != nil }, set: { if !$0 { vm.errorMessage = nil } })) {
@@ -99,7 +97,6 @@ struct VaultView: View {
                 if ok { showAddExpense = false; await vm.loadVault(tripId: tripId) }
             }
         }
-        // Stripe PaymentSheet
         .paymentSheet(isPresented: $vm.showPaymentSheet, paymentSheet: vm.paymentSheet ?? dummyPaymentSheet()) { result in
             Task {
                 await vm.handlePaymentResult(result, tripId: tripId)
@@ -110,8 +107,6 @@ struct VaultView: View {
         }
     }
 
-    // Required because .paymentSheet() needs a non-optional PaymentSheet
-    // This is only used when paymentSheet is nil (never shown)
     private func dummyPaymentSheet() -> PaymentSheet {
         PaymentSheet(paymentIntentClientSecret: "pi_dummy_secret_dummy", configuration: PaymentSheet.Configuration())
     }
@@ -141,8 +136,8 @@ struct BalanceCard: View {
                     .font(.caption).foregroundColor(Color.nostiaTextSecond)
             }
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -183,14 +178,14 @@ struct ExpenseCard: View {
                 if let cat = entry.category {
                     Text(cat).font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.nostiaInput).cornerRadius(8)
+                        .glassEffect(in: Capsule())
                 }
             }
             .font(.caption)
 
             // Splits
             if let splits = entry.splits, !splits.isEmpty {
-                Divider().background(Color.nostriaBorder)
+                Divider().background(Color.white.opacity(0.1))
                 ForEach(splits) { split in
                     HStack {
                         Text(split.userName ?? "User \(split.userId)")
@@ -206,14 +201,11 @@ struct ExpenseCard: View {
                                 Button { onMarkPaid(split.id) } label: {
                                     Text("Cash").font(.caption.bold()).foregroundColor(.white)
                                         .padding(.horizontal, 8).padding(.vertical, 4)
-                                        .background(Color.nostiaInput).cornerRadius(8)
+                                        .glassEffect(in: RoundedRectangle(cornerRadius: 8))
                                 }
-                                Button {
-                                    onPayWithCard(split.id)
-                                } label: {
+                                Button { onPayWithCard(split.id) } label: {
                                     if payingId == split.id {
-                                        ProgressView().tint(.white).scaleEffect(0.7)
-                                            .frame(width: 60, height: 24)
+                                        ProgressView().tint(.white).scaleEffect(0.7).frame(width: 60, height: 24)
                                     } else {
                                         Text("Card").font(.caption.bold()).foregroundColor(.white)
                                             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -227,8 +219,8 @@ struct ExpenseCard: View {
                 }
             }
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         .alert("Delete Expense", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) { onDelete() }

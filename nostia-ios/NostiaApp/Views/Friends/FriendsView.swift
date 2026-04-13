@@ -22,21 +22,18 @@ struct FriendsView: View {
                     }
                 }
                 .padding(12)
-                .background(Color.nostiaCard)
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.nostriaBorder, lineWidth: 1))
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
 
                 Button("Search") { Task { await vm.search() } }
                     .font(.subheadline.bold()).foregroundColor(.white)
                     .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(Color.nostiaAccent).cornerRadius(8)
+                    .background(Color.nostiaAccent).cornerRadius(12)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
 
             if vm.isSearching {
                 LoadingView()
             } else if vm.searchPerformed {
-                // Search results
                 if vm.searchResults.isEmpty {
                     EmptyStateView(icon: "person", text: "No users found", sub: "Try a different name or username")
                 } else {
@@ -44,7 +41,7 @@ struct FriendsView: View {
                         UserSearchRow(user: user, onAdd: { Task { await vm.sendRequest(to: user.id) } })
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     }
-                    .listStyle(.plain).background(Color.nostiaBackground)
+                    .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                 }
             } else {
                 // Tab selector
@@ -71,10 +68,12 @@ struct FriendsView: View {
                                   })
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     }
-                    .listStyle(.plain).background(Color.nostiaBackground)
+                    .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                     .refreshable { await vm.loadAll() }
                     .overlay {
-                        if vm.friends.isEmpty { EmptyStateView(icon: "person.2", text: "No friends yet", sub: "Search for users to connect!") }
+                        if vm.friends.isEmpty {
+                            EmptyStateView(icon: "person.2", text: "No friends yet", sub: "Search for users to connect!")
+                        }
                     }
                 } else {
                     List(vm.receivedRequests) { req in
@@ -83,15 +82,17 @@ struct FriendsView: View {
                                    onReject: { Task { await vm.rejectRequest(req.id) } })
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     }
-                    .listStyle(.plain).background(Color.nostiaBackground)
+                    .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                     .refreshable { await vm.loadAll() }
                     .overlay {
-                        if vm.receivedRequests.isEmpty { EmptyStateView(icon: "envelope", text: "No pending requests", sub: "") }
+                        if vm.receivedRequests.isEmpty {
+                            EmptyStateView(icon: "envelope", text: "No pending requests", sub: "")
+                        }
                     }
                 }
             }
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .task { await vm.loadAll() }
         .alert("Error", isPresented: Binding(get: { vm.errorMessage != nil }, set: { if !$0 { vm.errorMessage = nil } })) {
             Button("OK") { vm.errorMessage = nil }
@@ -128,18 +129,20 @@ struct FriendRow: View {
                     Image(systemName: "bubble.left.fill")
                         .foregroundColor(.white).padding(8)
                         .background(Color.nostiaAccent).clipShape(Circle())
+                        .shadow(color: Color.nostiaAccent.opacity(0.4), radius: 6)
                 }
                 Text(friend.isHomeOpen ? "🏠 Open" : "🔒 Closed")
                     .font(.caption.bold()).foregroundColor(.white)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(friend.isHomeOpen ? Color(hex: "065F46") : Color.nostiaInput)
-                    .cornerRadius(16)
+                    .glassEffect(in: Capsule())
+                    .overlay(Capsule().stroke(
+                        friend.isHomeOpen ? Color.nostiaSuccess.opacity(0.6) : Color.nostriaBorder,
+                        lineWidth: 1
+                    ))
             }
         }
         .padding(16)
-        .background(Color.nostiaCard)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
     }
 }
@@ -168,8 +171,8 @@ struct RequestRow: View {
                 }
             }
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
     }
 }
@@ -188,10 +191,11 @@ struct UserSearchRow: View {
             Button { onAdd() } label: {
                 Image(systemName: "person.badge.plus").foregroundColor(.white).padding(8)
                     .background(Color.nostiaAccent).clipShape(Circle())
+                    .shadow(color: Color.nostiaAccent.opacity(0.4), radius: 6)
             }
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
     }
 }
@@ -200,10 +204,12 @@ struct TabButton: View {
     let title: String; let isActive: Bool; let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.subheadline.bold()).foregroundColor(isActive ? .white : Color.nostiaTextSecond)
+            Text(title)
+                .font(.subheadline.bold())
+                .foregroundColor(isActive ? .white : Color.nostiaTextSecond)
                 .frame(maxWidth: .infinity).padding(.vertical, 10)
-                .background(isActive ? Color.nostiaAccent : Color.nostiaCard)
-                .cornerRadius(8)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                .overlay(isActive ? RoundedRectangle(cornerRadius: 10).stroke(Color.nostiaAccent, lineWidth: 1) : nil)
         }
     }
 }

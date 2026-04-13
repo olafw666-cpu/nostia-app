@@ -15,9 +15,7 @@ struct AdventuresView: View {
                     .autocorrectionDisabled()
             }
             .padding(12)
-            .background(Color.nostiaCard)
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.nostriaBorder, lineWidth: 1))
+            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 16).padding(.vertical, 8)
 
             // Tab selector
@@ -35,7 +33,7 @@ struct AdventuresView: View {
                         .listRowBackground(Color.clear).listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                 }
-                .listStyle(.plain).background(Color.nostiaBackground)
+                .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                 .refreshable { await vm.loadAll() }
                 .overlay {
                     if vm.events.isEmpty { EmptyStateView(icon: "calendar", text: "No events", sub: "Check back soon!") }
@@ -65,26 +63,26 @@ struct AdventuresView: View {
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     }
-                    .listStyle(.plain).background(Color.nostiaBackground)
+                    .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                     .refreshable { await vm.loadAll() }
                     .overlay {
-                        if vm.adventures.isEmpty { EmptyStateView(icon: "safari", text: "No adventures", sub: "Be the first to add one!") }
+                        if vm.adventures.isEmpty {
+                            EmptyStateView(icon: "safari", text: "No adventures", sub: "Be the first to add one!")
+                        }
                     }
 
                     Button(action: { showCreateAdventure = true }) {
                         Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 22, weight: .bold)).foregroundColor(.white)
                             .frame(width: 56, height: 56)
-                            .background(Color.nostiaAccent)
-                            .clipShape(Circle())
-                            .shadow(radius: 6)
+                            .background(Color.nostiaAccent).clipShape(Circle())
+                            .shadow(color: Color.nostiaAccent.opacity(0.5), radius: 12, y: 6)
                     }
                     .padding(20)
                 }
             }
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .task { await vm.loadAll() }
         .sheet(isPresented: $showCreateAdventure) {
             CreateAdventureSheet(vm: vm, isPresented: $showCreateAdventure)
@@ -114,8 +112,8 @@ struct EventCard: View {
             Label(event.formattedDate, systemImage: "calendar")
                 .font(.footnote.bold()).foregroundColor(Color.nostiaWarning)
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -146,8 +144,8 @@ struct AdventureCard: View {
                 }
             }
         }
-        .padding(16).background(Color.nostiaCard).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+        .padding(16)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -172,32 +170,32 @@ struct CreateAdventureSheet: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Group {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Title *").font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
+                            Text("Title *").font(.caption.bold()).foregroundColor(.white.opacity(0.7))
                             TextField("e.g., Eagle Peak Trail", text: $title)
-                                .padding(12).background(Color.nostiaCard).cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.nostriaBorder, lineWidth: 1))
+                                .padding(12)
+                                .glassEffect(in: RoundedRectangle(cornerRadius: 10))
                                 .foregroundColor(.white)
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Location *").font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
+                            Text("Location *").font(.caption.bold()).foregroundColor(.white.opacity(0.7))
                             TextField("e.g., Rocky Mountain National Park", text: $location)
-                                .padding(12).background(Color.nostiaCard).cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.nostriaBorder, lineWidth: 1))
+                                .padding(12)
+                                .glassEffect(in: RoundedRectangle(cornerRadius: 10))
                                 .foregroundColor(.white)
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Description").font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
+                            Text("Description").font(.caption.bold()).foregroundColor(.white.opacity(0.7))
                             TextEditor(text: $description)
                                 .frame(minHeight: 80)
-                                .padding(8).background(Color.nostiaCard).cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.nostriaBorder, lineWidth: 1))
+                                .padding(8)
+                                .glassEffect(in: RoundedRectangle(cornerRadius: 10))
                                 .foregroundColor(.white)
                                 .scrollContentBackground(.hidden)
                         }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Category").font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
+                        Text("Category").font(.caption.bold()).foregroundColor(.white.opacity(0.7))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(categories, id: \.self) { cat in
@@ -212,7 +210,7 @@ struct CreateAdventureSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Difficulty").font(.caption.bold()).foregroundColor(Color.nostiaTextSecond)
+                        Text("Difficulty").font(.caption.bold()).foregroundColor(.white.opacity(0.7))
                         HStack(spacing: 8) {
                             ForEach(difficulties, id: \.self) { diff in
                                 FilterChip(
@@ -225,7 +223,7 @@ struct CreateAdventureSheet: View {
                     }
 
                     if let err = errorMessage {
-                        Text(err).font(.caption).foregroundColor(.red)
+                        Text(err).font(.caption).foregroundColor(Color.nostriaDanger)
                     }
 
                     Button(action: {
@@ -234,8 +232,7 @@ struct CreateAdventureSheet: View {
                             errorMessage = "Title and location are required"
                             return
                         }
-                        isLoading = true
-                        errorMessage = nil
+                        isLoading = true; errorMessage = nil
                         Task {
                             do {
                                 try await vm.createAdventure(
@@ -256,26 +253,30 @@ struct CreateAdventureSheet: View {
                             if isLoading { ProgressView().tint(.white) }
                             else { Text("Create Adventure").fontWeight(.bold) }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(title.isEmpty || location.isEmpty ? Color.nostiaCard : Color.nostiaAccent)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .frame(maxWidth: .infinity).padding()
+                        .background(
+                            title.isEmpty || location.isEmpty
+                                ? AnyShapeStyle(Color.nostiaInput)
+                                : AnyShapeStyle(LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
+                                                               startPoint: .leading, endPoint: .trailing))
+                        )
+                        .foregroundColor(.white).cornerRadius(14)
+                        .shadow(color: Color.nostiaAccent.opacity(title.isEmpty ? 0 : 0.4), radius: 10, y: 5)
                     }
                     .disabled(isLoading || title.isEmpty || location.isEmpty)
                 }
                 .padding(20)
             }
-            .background(Color.nostiaBackground.ignoresSafeArea())
+            .background(.clear)
             .navigationTitle("New Adventure")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isPresented = false }
-                        .foregroundColor(Color.nostiaTextSecond)
+                    Button("Cancel") { isPresented = false }.foregroundColor(Color.nostiaTextSecond)
                 }
             }
         }
+        .presentationBackground(.ultraThinMaterial)
     }
 }
 
@@ -294,20 +295,5 @@ struct DifficultyBadge: View {
         Text(difficulty).font(.caption.bold()).foregroundColor(.white)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(color).cornerRadius(12)
-    }
-}
-
-struct FilterChip: View {
-    let title: String; let isActive: Bool; let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            Text(title).font(.caption.bold())
-                .foregroundColor(isActive ? .white : Color.nostiaTextSecond)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(isActive ? Color.nostiaAccent : Color.nostiaCard)
-                .cornerRadius(16)
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(
-                    isActive ? Color.nostiaAccent : Color.nostriaBorder, lineWidth: 1))
-        }
     }
 }

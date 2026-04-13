@@ -14,7 +14,7 @@ struct NotificationsView: View {
                         .font(.footnote.bold()).foregroundColor(Color.nostiaAccent)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
-                .overlay(Divider().background(Color.nostriaBorder), alignment: .bottom)
+                .overlay(Divider().background(Color.white.opacity(0.1)), alignment: .bottom)
             }
 
             if vm.isLoading {
@@ -27,7 +27,7 @@ struct NotificationsView: View {
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 }
-                .listStyle(.plain).background(Color.nostiaBackground)
+                .listStyle(.plain).background(.clear).scrollContentBackground(.hidden)
                 .refreshable { await vm.load() }
                 .overlay {
                     if vm.notifications.isEmpty {
@@ -36,7 +36,7 @@ struct NotificationsView: View {
                 }
             }
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .task { await vm.load() }
     }
 }
@@ -52,8 +52,8 @@ struct NotificationRow: View {
                     .font(.title3)
                     .foregroundColor(Color(hex: notification.iconColorHex))
                     .frame(width: 48, height: 48)
-                    .background(Color(hex: notification.iconColorHex).opacity(0.15))
-                    .clipShape(Circle())
+                    .glassEffect(in: Circle())
+                    .overlay(Circle().stroke(Color(hex: notification.iconColorHex).opacity(0.3), lineWidth: 1))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(notification.title).font(.headline).foregroundColor(.white)
@@ -63,13 +63,15 @@ struct NotificationRow: View {
                 Spacer()
                 if !notification.read {
                     Circle().fill(Color.nostiaAccent).frame(width: 10, height: 10)
+                        .shadow(color: Color.nostiaAccent.opacity(0.6), radius: 4)
                 }
             }
             .padding(16)
-            .background(notification.read ? Color.nostiaCard : Color(hex: "1E3A5F"))
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(
-                notification.read ? Color.nostriaBorder : Color.nostiaAccent, lineWidth: 1))
+            .glassEffect(in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                notification.read ? nil :
+                RoundedRectangle(cornerRadius: 16).stroke(Color.nostiaAccent.opacity(0.3), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

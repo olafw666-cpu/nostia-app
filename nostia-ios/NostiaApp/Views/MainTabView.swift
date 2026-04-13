@@ -14,6 +14,7 @@ struct MainTabView: View {
                 HomeView()
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Home", systemImage: selectedTab == 0 ? "house.fill" : "house") }
             .tag(0)
@@ -23,6 +24,7 @@ struct MainTabView: View {
                     .navigationTitle("My Trips")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Trips", systemImage: "airplane") }
             .tag(1)
@@ -32,6 +34,7 @@ struct MainTabView: View {
                     .navigationTitle("Feed")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Feed", systemImage: selectedTab == 2 ? "photo.on.rectangle.angled.fill" : "photo.on.rectangle.angled") }
             .tag(2)
@@ -41,6 +44,7 @@ struct MainTabView: View {
                     .navigationTitle("Discover")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Discover", systemImage: selectedTab == 3 ? "safari.fill" : "safari") }
             .tag(3)
@@ -50,6 +54,7 @@ struct MainTabView: View {
                     .navigationTitle("Friends")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Friends", systemImage: selectedTab == 4 ? "person.2.fill" : "person.2") }
             .tag(4)
@@ -59,15 +64,13 @@ struct MainTabView: View {
                     .navigationTitle("Friends Map")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { tabBarToolbar }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
             .tabItem { Label("Map", systemImage: selectedTab == 5 ? "map.fill" : "map") }
             .tag(5)
         }
         .tint(Color.nostiaAccent)
         .onAppear {
-            UITabBar.appearance().barTintColor = UIColor(Color.nostiaCard)
-            UITabBar.appearance().backgroundColor = UIColor(Color.nostiaCard)
-            UITabBar.appearance().unselectedItemTintColor = UIColor(Color.nostiaTextMuted)
             loadUnreadCount()
             loadUserRole()
         }
@@ -82,7 +85,9 @@ struct MainTabView: View {
                                 .foregroundColor(Color.nostiaAccent)
                         }
                     }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
+            .presentationBackground(.ultraThinMaterial)
         }
         .sheet(isPresented: $showSettings) {
             NavigationStack {
@@ -101,7 +106,9 @@ struct MainTabView: View {
                             }
                         }
                     }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
+            .presentationBackground(.ultraThinMaterial)
         }
         .sheet(isPresented: $showAnalytics) {
             NavigationStack {
@@ -114,7 +121,9 @@ struct MainTabView: View {
                                 .foregroundColor(Color.nostiaAccent)
                         }
                     }
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
+            .presentationBackground(.ultraThinMaterial)
         }
     }
 

@@ -4,32 +4,33 @@ struct LoginView: View {
     @StateObject private var vm = AuthViewModel()
     @State private var username = ""
     @State private var password = ""
-    @State private var showPassword = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Header gradient
+                // Header
                 LinearGradient(
                     colors: [Color.nostiaAccent, Color.nostriaPurple],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .frame(maxWidth: .infinity)
-                .frame(height: 280)
+                .frame(height: 300)
                 .overlay {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
                         Image(systemName: "safari.fill")
-                            .font(.system(size: 64))
+                            .font(.system(size: 72))
                             .foregroundColor(.white)
+                            .shadow(color: .white.opacity(0.3), radius: 20)
                         Text("Welcome Back")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 34, weight: .bold))
                             .foregroundColor(.white)
                         Text("Sign in to continue your adventure")
                             .font(.subheadline)
                             .foregroundColor(Color(hex: "E0E7FF"))
                     }
                 }
+                .ignoresSafeArea(edges: .top)
 
                 // Form
                 VStack(spacing: 20) {
@@ -39,8 +40,11 @@ struct LoginView: View {
                             .foregroundColor(Color.nostriaDanger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
-                            .background(Color.nostriaDanger.opacity(0.15))
-                            .cornerRadius(8)
+                            .glassEffect(in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.nostriaDanger.opacity(0.5), lineWidth: 1)
+                            )
                     }
 
                     NostiaTextField(label: "Username", placeholder: "Enter your username", text: $username)
@@ -68,7 +72,8 @@ struct LoginView: View {
                             LinearGradient(colors: [Color.nostiaAccent, Color.nostriaPurple],
                                            startPoint: .leading, endPoint: .trailing)
                         )
-                        .cornerRadius(12)
+                        .cornerRadius(16)
+                        .shadow(color: Color.nostiaAccent.opacity(0.4), radius: 12, y: 6)
                     }
                     .disabled(vm.isLoading)
 
@@ -85,7 +90,7 @@ struct LoginView: View {
                 .padding(24)
             }
         }
-        .background(Color.nostiaBackground)
+        .background(.clear)
         .scrollBounceBehavior(.basedOnSize)
         .navigationBarHidden(true)
     }
@@ -103,13 +108,11 @@ struct NostiaTextField: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "D1D5DB"))
+                .foregroundColor(.white.opacity(0.7))
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
                 .padding(16)
-                .background(Color.nostiaCard)
-                .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
                 .foregroundColor(.white)
         }
     }
@@ -125,7 +128,7 @@ struct NostiaSecureField: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "D1D5DB"))
+                .foregroundColor(.white.opacity(0.7))
             HStack {
                 Group {
                     if show { TextField(placeholder, text: $text) }
@@ -133,13 +136,12 @@ struct NostiaSecureField: View {
                 }
                 .foregroundColor(.white)
                 Button { show.toggle() } label: {
-                    Image(systemName: show ? "eye.slash" : "eye").foregroundColor(Color.nostiaTextMuted)
+                    Image(systemName: show ? "eye.slash" : "eye")
+                        .foregroundColor(Color.nostiaTextMuted)
                 }
             }
             .padding(16)
-            .background(Color.nostiaCard)
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.nostriaBorder, lineWidth: 1))
+            .glassEffect(in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }

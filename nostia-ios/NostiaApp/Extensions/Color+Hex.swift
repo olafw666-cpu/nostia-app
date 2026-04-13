@@ -24,18 +24,40 @@ extension Color {
     }
 }
 
-// Design tokens matching Expo app
+// Design tokens
 extension Color {
-    static let nostiaBackground  = Color(hex: "111827")
-    static let nostiaCard        = Color(hex: "1F2937")
+    // Backgrounds — deep navy/indigo for rich glass refraction
+    static let nostiaBackground  = Color(hex: "0C1120")
+    static let nostiaCard        = Color(hex: "1C2537")
+
+    // Borders & inputs
     static let nostriaBorder     = Color(hex: "374151")
+    static let nostiaInput       = Color(hex: "1E2A3A")
+
+    // Accents & semantic
     static let nostiaAccent      = Color(hex: "3B82F6")
     static let nostiaSuccess     = Color(hex: "10B981")
     static let nostiaWarning     = Color(hex: "F59E0B")
     static let nostriaDanger     = Color(hex: "EF4444")
+    static let nostriaPurple     = Color(hex: "8B5CF6")
+
+    // Text
     static let nostiaTextPrimary = Color.white
     static let nostiaTextSecond  = Color(hex: "9CA3AF")
     static let nostiaTextMuted   = Color(hex: "6B7280")
-    static let nostiaInput       = Color(hex: "374151")
-    static let nostriaPurple     = Color(hex: "8B5CF6")
+}
+
+// Shared gradient used as the base for all liquid glass screens
+extension ShapeStyle where Self == LinearGradient {
+    static var nostiaGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: Color(hex: "0C1120"), location: 0.0),
+                .init(color: Color(hex: "1A0E35"), location: 0.5),
+                .init(color: Color(hex: "0A1628"), location: 1.0)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 }
