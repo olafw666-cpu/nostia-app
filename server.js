@@ -43,6 +43,9 @@ const AnalyticsService = require('./services/analyticsService');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Trust one proxy hop (Nginx) so X-Forwarded-For is used for rate limiting and IP logging
+app.set('trust proxy', 1);
+
 // ==================== SECURITY MIDDLEWARE ====================
 
 // Security headers (HSTS, X-Frame-Options, etc.)
