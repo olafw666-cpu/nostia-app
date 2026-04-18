@@ -737,10 +737,11 @@ app.post('/api/trips/:id/invite', authenticateToken, (req, res) => {
 
 // ==================== EVENT ROUTES ====================
 
-// Get all events
+// Get all events (filtered by visibility)
 app.get('/api/events', optionalAuth, (req, res) => {
   try {
-    const events = Event.getAll();
+    const userId = req.user?.id ?? null;
+    const events = Event.getAll(userId);
     res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -865,7 +866,8 @@ app.get('/api/vault/trip/:tripId', authenticateToken, (req, res) => {
 // Create vault entry (expense)
 app.post('/api/vault', authenticateToken, (req, res) => {
   try {
-    const { tripId, description, amount, currency, paidBy, category, date, splits } = req.body;
+    const { tripId, description, amount, currency, category, date, splits } = req.body;
+    const paidBy = req.body.paidBy ?? req.user.id;
 
     let finalSplits = splits;
 

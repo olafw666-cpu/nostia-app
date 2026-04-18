@@ -1,15 +1,20 @@
 const db = require('../database/db');
 
+// Add visibility column if it doesn't exist yet
+try {
+  db.prepare(`ALTER TABLE events ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`).run();
+} catch (_) { /* column already exists */ }
+
 class Event {
   static create(eventData) {
-    const { title, description, location, eventDate, createdBy, type, latitude, longitude } = eventData;
+    const { title, description, location, eventDate, createdBy, type, latitude, longitude, visibility } = eventData;
 
     const stmt = db.prepare(`
-      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude, visibility)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(title, description, location, eventDate, createdBy, type || 'social', latitude || null, longitude || null);
+    const result = stmt.run(title, description, location, eventDate, createdBy, type || 'social', latitude || null, longitude || null, visibility || 'public');
     return this.findById(result.lastInsertRowid);
   }
 
@@ -24,15 +29,26 @@ class Event {
     return stmt.get(id);
   }
 
-  static getAll() {
+  static getAll(requestingUserId = null) {
+    // public: everyone sees; friends: only friends + creator; private: only creator
     const stmt = db.prepare(`
       SELECT e.*, u.username as creatorUsername, u.name as creatorName
       FROM events e
       INNER JOIN users u ON e.createdBy = u.id
+      WHERE e.visibility = 'public'
+        OR e.createdBy = ?
+        OR (
+          e.visibility = 'friends'
+          AND EXISTS (
+            SELECT 1 FROM friends f
+            WHERE f.status = 'accepted'
+              AND ((f.userId = ? AND f.friendId = e.createdBy) OR (f.friendId = ? AND f.userId = e.createdBy))
+          )
+        )
       ORDER BY e.eventDate DESC
     `);
 
-    return stmt.all();
+    return stmt.all(requestingUserId, requestingUserId, requestingUserId);
   }
 
   static getUserEvents(userId) {
@@ -61,7 +77,7 @@ class Event {
   }
 
   static update(id, updates) {
-    const allowedFields = ['title', 'description', 'location', 'eventDate', 'type', 'latitude', 'longitude'];
+    const allowedFields = ['title', 'description', 'location', 'eventDate', 'type', 'latitude', 'longitude', 'visibility'];
     const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
 
     if (fields.length === 0) return this.findById(id);
