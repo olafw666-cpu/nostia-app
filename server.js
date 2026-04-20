@@ -536,8 +536,12 @@ app.post('/api/friends/accept/:requestId', authenticateToken, (req, res) => {
     const friendRequest = Friend.getById(reqIdInt);
     console.log(`[ACCEPT] requestId=${reqIdInt} friendRequest=${JSON.stringify(friendRequest)} userId=${req.user.id}`);
 
-    if (!friendRequest || Number(friendRequest.friendId) !== Number(req.user.id)) {
-      console.log(`[ACCEPT] 403: friendId=${friendRequest?.friendId} userId=${req.user.id}`);
+    if (!friendRequest) {
+      console.log(`[ACCEPT] 404: requestId=${reqIdInt} not found`);
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+    if (Number(friendRequest.friendId) !== Number(req.user.id)) {
+      console.log(`[ACCEPT] 403: friendId=${friendRequest.friendId} userId=${req.user.id}`);
       return res.status(403).json({ error: 'Not authorized to accept this request' });
     }
 
@@ -554,14 +558,17 @@ app.post('/api/friends/accept/:requestId', authenticateToken, (req, res) => {
 app.delete('/api/friends/reject/:requestId', authenticateToken, (req, res) => {
   try {
     const { requestId } = req.params;
+    const reqIdInt = parseInt(requestId, 10);
 
-    // Verify the request is addressed to the authenticated user
-    const friendRequest = Friend.getById(requestId);
-    if (!friendRequest || friendRequest.friendId !== req.user.id) {
+    const friendRequest = Friend.getById(reqIdInt);
+    if (!friendRequest) {
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+    if (Number(friendRequest.friendId) !== Number(req.user.id)) {
       return res.status(403).json({ error: 'Not authorized to reject this request' });
     }
 
-    Friend.rejectRequest(requestId);
+    Friend.rejectRequest(reqIdInt);
     res.json({ message: 'Friend request rejected' });
   } catch (error) {
     res.status(500).json({ error: error.message });
