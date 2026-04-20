@@ -492,8 +492,10 @@ app.get('/api/consent/history', authenticateToken, (req, res) => {
 app.get('/api/friends', authenticateToken, (req, res) => {
   try {
     const friends = Friend.getFriends(req.user.id);
+    console.log(`[FRIENDS] userId=${req.user.id} count=${friends.length}`);
     res.json(friends);
   } catch (error) {
+    console.error(`[FRIENDS] error for userId=${req.user.id}: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
@@ -529,16 +531,21 @@ app.post('/api/friends/request', authenticateToken, (req, res) => {
 app.post('/api/friends/accept/:requestId', authenticateToken, (req, res) => {
   try {
     const { requestId } = req.params;
+    const reqIdInt = parseInt(requestId, 10);
 
-    // Verify the request is addressed to the authenticated user
-    const friendRequest = Friend.getById(requestId);
-    if (!friendRequest || friendRequest.friendId !== req.user.id) {
+    const friendRequest = Friend.getById(reqIdInt);
+    console.log(`[ACCEPT] requestId=${reqIdInt} friendRequest=${JSON.stringify(friendRequest)} userId=${req.user.id}`);
+
+    if (!friendRequest || Number(friendRequest.friendId) !== Number(req.user.id)) {
+      console.log(`[ACCEPT] 403: friendId=${friendRequest?.friendId} userId=${req.user.id}`);
       return res.status(403).json({ error: 'Not authorized to accept this request' });
     }
 
-    const request = Friend.acceptRequest(requestId);
+    const request = Friend.acceptRequest(reqIdInt);
+    console.log(`[ACCEPT] success: ${JSON.stringify(request)}`);
     res.json(request);
   } catch (error) {
+    console.error(`[ACCEPT] error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
