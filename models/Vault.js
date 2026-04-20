@@ -168,7 +168,7 @@ class Vault {
       WHERE vs.vaultEntryId = ?
     `);
 
-    return stmt.all(vaultEntryId);
+    return stmt.all(vaultEntryId).map(s => ({ ...s, paid: s.paid === 1 }));
   }
 
   // Mark split as paid

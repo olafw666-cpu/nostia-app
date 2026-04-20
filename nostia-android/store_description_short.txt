@@ -1,0 +1,40 @@
+SHORT DESCRIPTION (70 characters)
+──────────────────────────────────
+Plan trips, split costs, and explore adventures with your travel crew.
+
+
+LONG DESCRIPTION (3,748 characters)
+────────────────────────────────────
+Nostia is the all-in-one social travel app built for people who explore together. Whether you're planning a weekend hiking trip, splitting costs after a group vacation, or just want to know which friends are up for a spontaneous adventure — Nostia keeps your crew connected every step of the way.
+
+── PLAN TRIPS TOGETHER ──
+Create and organize trips with your friends in one place. Add a destination, set your dates, and keep everything on track from your first idea to your last day. Your upcoming trips are front and center the moment you open the app, so nothing slips through the cracks. Nostia also surfaces nearby events based on your location, so you can discover what's happening around you and add it to your plans.
+
+── SPLIT COSTS WITHOUT THE AWKWARD FOLLOW-UPS ──
+The Vault is Nostia's built-in expense tracker for every trip. Log shared costs, see who paid what, and let Nostia automatically calculate who owes who. When it's time to settle up, pay directly inside the app using Stripe's secure payment system — no IOUs, no spreadsheets, no uncomfortable reminders. Each trip gets its own Vault with a full expense history, running balances, and a one-tap Pay button for any outstanding splits.
+
+── DISCOVER AND BROWSE ADVENTURES ──
+Not sure what to do next? Browse a curated catalogue of adventures filtered by category — Hiking, Cycling, Water Sports, Travel, Urban, and more. Each adventure includes a difficulty rating, description, and location so you can find something that fits your group. Feeling inspired? Share your own experiences in the social Feed, like and comment on posts from your crew, and build a living record of everywhere you've been together.
+
+── STAY CONNECTED WITH YOUR CREW ──
+Find friends on Nostia, see where they are on the map, and check who's available to hang out. The Home Status feature lets you broadcast when you're open for friends to drop by — one toggle and your crew knows you're around. Chat directly with friends, get notified when something needs your attention, and never miss a moment that matters.
+
+── BUILT FOR REAL TRAVEL ──
+Nostia is designed around how groups actually travel — messy, spontaneous, and full of people who all want different things. Instead of juggling separate apps for planning, messaging, and splitting bills, Nostia brings it all into one place so you can spend less time coordinating and more time actually going places.
+
+── FEATURES AT A GLANCE ──
+• Trip planning with destinations, dates, and group tracking
+• Nearby event discovery using your current location
+• Vault — per-trip expense tracking with automatic cost splitting
+• In-app payments powered by Stripe
+• Adventure catalogue with category filters and difficulty ratings
+• Social feed with posts, likes, and comments
+• Friends map to see your crew's locations
+• Home Status — let friends know when you're available
+• In-app messaging and push notifications
+• Secure authentication with encrypted local storage
+
+── YOUR PRIVACY, PROTECTED ──
+Nostia stores your credentials using Android's encrypted Keystore system. Your data stays on your device unless you choose to share it. Location access is requested only when you want to discover nearby events or share your position with friends — never in the background without your knowledge.
+
+Download Nostia and start exploring together.
