@@ -16,7 +16,12 @@ class User {
   }
 
   static findById(id) {
-    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const stmt = db.prepare(`
+      SELECT u.*,
+        (SELECT COUNT(*) FROM friends
+         WHERE (userId = u.id OR friendId = u.id) AND status = 'accepted') as friendsCount
+      FROM users u WHERE u.id = ?
+    `);
     const user = stmt.get(id);
     if (user) {
       delete user.password;
@@ -52,7 +57,7 @@ class User {
   }
 
   static update(id, updates) {
-    const allowedFields = ['name', 'username', 'email', 'homeStatus', 'latitude', 'longitude', 'role'];
+    const allowedFields = ['name', 'username', 'email', 'homeStatus', 'latitude', 'longitude', 'role', 'bio', 'profile_picture_url'];
     const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
 
     if (fields.length === 0) return this.findById(id);

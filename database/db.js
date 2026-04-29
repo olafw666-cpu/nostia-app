@@ -669,6 +669,15 @@ function initializeDatabase() {
     )
   `);
 
+  // User profile fields
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN bio TEXT`);
+  } catch (e) {}
+
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN profile_picture_url TEXT`);
+  } catch (e) {}
+
   console.log('✅ Database tables initialized successfully');
 }
 

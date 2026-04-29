@@ -406,6 +406,9 @@ app.get('/api/users/:id', authenticateToken, (req, res) => {
 app.put('/api/users/me', authenticateToken, (req, res) => {
   try {
     const updates = req.body;
+    if (updates.bio != null && typeof updates.bio === 'string' && updates.bio.length > 100) {
+      return res.status(400).json({ error: 'Bio must be 100 characters or less' });
+    }
     const user = User.update(req.user.id, updates);
     res.json(user);
   } catch (error) {
