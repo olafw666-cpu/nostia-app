@@ -98,8 +98,8 @@ class Vault {
         if (!balances[split.userId]) {
           balances[split.userId] = {
             userId: split.userId,
-            username: split.username,
-            name: split.name,
+            username: split.userName,
+            name: split.userName,
             paid: 0,
             owes: 0,
             balance: 0
