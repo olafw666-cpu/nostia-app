@@ -816,6 +816,16 @@ app.get('/api/events/nearby', authenticateToken, (req, res) => {
   }
 });
 
+// Get events the authenticated user has RSVP'd as going
+app.get('/api/events/mine', authenticateToken, (req, res) => {
+  try {
+    const events = Event.getMyGoingEvents(req.user.id);
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get event by ID
 app.get('/api/events/:id', optionalAuth, (req, res) => {
   try {

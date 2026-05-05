@@ -100,6 +100,19 @@ class Event {
     return stmt.run(id);
   }
 
+  static getMyGoingEvents(userId, limit = 20) {
+    return db.prepare(`
+      SELECT e.*, u.username as creatorUsername, u.name as creatorName,
+        (SELECT COUNT(*) FROM event_rsvps WHERE eventId = e.id AND status = 'going') as goingCount,
+        'going' as myRsvp
+      FROM events e
+      INNER JOIN users u ON e.createdBy = u.id
+      INNER JOIN event_rsvps r ON r.eventId = e.id AND r.userId = ? AND r.status = 'going'
+      ORDER BY e.eventDate ASC
+      LIMIT ?
+    `).all(userId, limit);
+  }
+
   static setRsvp(eventId, userId, status) {
     db.prepare(`
       INSERT INTO event_rsvps (eventId, userId, status)
