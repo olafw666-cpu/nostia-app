@@ -10,14 +10,14 @@ try {
 
 class Event {
   static create(eventData) {
-    const { title, description, location, eventDate, createdBy, type, latitude, longitude, visibility } = eventData;
+    const { title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage } = eventData;
 
     const stmt = db.prepare(`
-      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude, visibility)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(title, description, location, eventDate, createdBy, type || 'social', latitude || null, longitude || null, visibility || 'public');
+    const result = stmt.run(title, description, location, eventDate, createdBy, type || 'social', latitude || null, longitude || null, visibility || 'public', flyerImage || null);
     return this.findById(result.lastInsertRowid, createdBy);
   }
 
