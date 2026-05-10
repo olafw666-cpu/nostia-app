@@ -710,7 +710,46 @@ function initializeDatabase() {
   try { db.exec(`ALTER TABLE feed_posts ADD COLUMN author_lat REAL`); } catch(e) {}
   try { db.exec(`ALTER TABLE feed_posts ADD COLUMN author_lng REAL`); } catch(e) {}
 
+  // Map redesign: radius-based event visibility
+  try { db.exec(`ALTER TABLE events ADD COLUMN event_radius_miles REAL DEFAULT 20`); } catch(e) {}
+  try { db.exec(`ALTER TABLE events ADD COLUMN is_global INTEGER DEFAULT 0`); } catch(e) {}
+
+  // Private event invitees
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS event_invitees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      eventId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
+      UNIQUE(eventId, userId),
+      FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_event_invitees_event ON event_invitees(eventId)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_event_invitees_user ON event_invitees(userId)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_events_is_global ON events(is_global)`);
+
+  // Schema migrations tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY,
+      appliedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   console.log('✅ Database tables initialized successfully');
+}
+
+function runMigrations() {
+  const hasMigration = db.prepare(`SELECT 1 FROM schema_migrations WHERE name = ?`).get;
+
+  // Migration: wipe all event data for map redesign release
+  if (!db.prepare(`SELECT 1 FROM schema_migrations WHERE name = 'map_redesign_event_wipe'`).get()) {
+    db.prepare(`DELETE FROM event_rsvps`).run();
+    db.prepare(`DELETE FROM events`).run();
+    db.prepare(`INSERT INTO schema_migrations (name) VALUES ('map_redesign_event_wipe')`).run();
+    console.log('✅ Migration: map_redesign_event_wipe — all event and RSVP data wiped');
+  }
 }
 
 // Seed some initial data for testing
@@ -774,5 +813,6 @@ function seedDatabase() {
 // Initialize on module load
 initializeDatabase();
 seedDatabase();
+runMigrations();
 
 module.exports = db;

@@ -770,6 +770,31 @@ app.post('/api/invite/redeem', authenticateToken, (req, res) => {
 
 // ==================== EVENT ROUTES ====================
 
+// Get events for map viewport — radius-based visibility
+// Query params: minLat, maxLat, minLng, maxLng, viewportRadiusMiles (default 20)
+app.get('/api/events/map', optionalAuth, (req, res) => {
+  try {
+    const { minLat, maxLat, minLng, maxLng, viewportRadiusMiles } = req.query;
+    if (minLat === undefined || maxLat === undefined || minLng === undefined || maxLng === undefined) {
+      return res.status(400).json({ error: 'minLat, maxLat, minLng, maxLng are required' });
+    }
+    const viewport = {
+      minLat: parseFloat(minLat),
+      maxLat: parseFloat(maxLat),
+      minLng: parseFloat(minLng),
+      maxLng: parseFloat(maxLng),
+      viewportRadiusMiles: parseFloat(viewportRadiusMiles) || 20,
+    };
+    if ([viewport.minLat, viewport.maxLat, viewport.minLng, viewport.maxLng].some(isNaN)) {
+      return res.status(400).json({ error: 'Invalid viewport coordinates' });
+    }
+    const events = Event.getMapEvents(req.user?.id ?? null, viewport);
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all events (filtered by visibility)
 app.get('/api/events', optionalAuth, (req, res) => {
   try {
@@ -840,13 +865,17 @@ app.get('/api/events/:id', optionalAuth, (req, res) => {
 });
 
 // Create new event
+// Body: title, description, location, eventDate, type, latitude, longitude,
+//       visibility ('public'|'private'), flyerImage, inviteeIds (array, private only)
 app.post('/api/events', authenticateToken, (req, res) => {
   try {
+    if (!req.body.latitude || !req.body.longitude) {
+      return res.status(400).json({ error: 'latitude and longitude are required' });
+    }
     const eventData = {
       ...req.body,
       createdBy: req.user.id
     };
-
     const event = Event.create(eventData);
     res.status(201).json(event);
   } catch (error) {
@@ -888,7 +917,7 @@ app.delete('/api/events/:id', authenticateToken, (req, res) => {
   }
 });
 
-// RSVP to an event
+// RSVP to an event — triggers immediate radius recomputation
 app.post('/api/events/:id/rsvp', authenticateToken, (req, res) => {
   try {
     const { status } = req.body;
@@ -899,6 +928,39 @@ app.post('/api/events/:id/rsvp', authenticateToken, (req, res) => {
     if (!event) return res.status(404).json({ error: 'Event not found' });
     Event.setRsvp(req.params.id, req.user.id, status);
     res.json(Event.findById(req.params.id, req.user.id));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add invitees to a private event (creator only)
+app.post('/api/events/:id/invitees', authenticateToken, (req, res) => {
+  try {
+    const event = Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.createdBy !== req.user.id) {
+      return res.status(403).json({ error: 'Only the event creator can manage invitees' });
+    }
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'userIds array is required' });
+    }
+    Event.addInvitees(req.params.id, userIds);
+    res.json({ invitees: Event.getInvitees(req.params.id) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get invitees for a private event (creator only)
+app.get('/api/events/:id/invitees', authenticateToken, (req, res) => {
+  try {
+    const event = Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.createdBy !== req.user.id) {
+      return res.status(403).json({ error: 'Only the event creator can view invitees' });
+    }
+    res.json({ invitees: Event.getInvitees(req.params.id) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
