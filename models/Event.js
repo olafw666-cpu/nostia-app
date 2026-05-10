@@ -17,18 +17,20 @@ class Event {
   }
 
   static create(eventData) {
-    const { title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage, inviteeIds } = eventData;
+    const { title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage, inviteeIds, isDevCreator } = eventData;
 
     const stmt = db.prepare(`
-      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage, event_radius_miles, is_global)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      INSERT INTO events (title, description, location, eventDate, createdBy, type, latitude, longitude, visibility, flyerImage, event_radius_miles, is_global, dev_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       title, description, location, eventDate, createdBy,
       type || 'social', latitude || null, longitude || null,
       visibility || 'public', flyerImage || null,
-      20 // initial radius: 0 attendees
+      20, // initial radius: 0 attendees
+      isDevCreator ? 1 : 0,
+      isDevCreator ? 1 : 0
     );
 
     const eventId = result.lastInsertRowid;
@@ -137,6 +139,10 @@ class Event {
       VALUES (?, ?, ?)
       ON CONFLICT(eventId, userId) DO UPDATE SET status = excluded.status
     `).run(eventId, userId, status);
+
+    // Dev-created events have is_global permanently true — skip radius recomputation
+    const event = db.prepare(`SELECT dev_created FROM events WHERE id = ?`).get(eventId);
+    if (event?.dev_created) return;
 
     // Recompute radius immediately after every RSVP change
     const { goingCount } = db.prepare(

@@ -714,6 +714,10 @@ function initializeDatabase() {
   try { db.exec(`ALTER TABLE events ADD COLUMN event_radius_miles REAL DEFAULT 20`); } catch(e) {}
   try { db.exec(`ALTER TABLE events ADD COLUMN is_global INTEGER DEFAULT 0`); } catch(e) {}
 
+  // Dev account: account_type on users, dev_created flag on events
+  try { db.exec(`ALTER TABLE users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'user'`); } catch(e) {}
+  try { db.exec(`ALTER TABLE events ADD COLUMN dev_created INTEGER DEFAULT 0`); } catch(e) {}
+
   // Private event invitees
   db.exec(`
     CREATE TABLE IF NOT EXISTS event_invitees (

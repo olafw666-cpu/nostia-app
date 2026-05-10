@@ -187,6 +187,15 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+// Dev-only middleware — verifies account_type = 'dev' server-side on every privileged call
+function requireDev(req, res, next) {
+  const user = db.prepare('SELECT account_type FROM users WHERE id = ?').get(req.user.id);
+  if (!user || user.account_type !== 'dev') {
+    return res.status(403).json({ error: 'Dev account required' });
+  }
+  next();
+}
+
 // Audit logger for sensitive actions (logs to console + DB)
 function auditLog(action, userId, details = {}, req = null) {
   const { ipAddress, ...rest } = details;
@@ -872,9 +881,11 @@ app.post('/api/events', authenticateToken, (req, res) => {
     if (!req.body.latitude || !req.body.longitude) {
       return res.status(400).json({ error: 'latitude and longitude are required' });
     }
+    const creator = db.prepare('SELECT account_type FROM users WHERE id = ?').get(req.user.id);
     const eventData = {
       ...req.body,
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      isDevCreator: creator?.account_type === 'dev'
     };
     const event = Event.create(eventData);
     res.status(201).json(event);
@@ -1731,6 +1742,58 @@ app.get('/api/analytics/reports/download/:id', authenticateToken, (req, res) => 
     );
 
     res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== DEV MODERATION ROUTES ====================
+
+// Dev: hard delete any post (post record + all associated likes, dislikes, comments via FK cascade)
+app.delete('/api/admin/posts/:id', authenticateToken, requireDev, (req, res) => {
+  try {
+    const post = db.prepare('SELECT id FROM feed_posts WHERE id = ?').get(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    db.prepare('DELETE FROM feed_posts WHERE id = ?').run(req.params.id);
+    auditLog('DEV_DELETE_POST', req.user.id, { postId: req.params.id }, req);
+    res.json({ message: 'Post deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dev: hard delete any event (event record + RSVPs + invitees via FK cascade)
+app.delete('/api/admin/events/:id', authenticateToken, requireDev, (req, res) => {
+  try {
+    const event = db.prepare('SELECT id FROM events WHERE id = ?').get(req.params.id);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    db.prepare('DELETE FROM events WHERE id = ?').run(req.params.id);
+    auditLog('DEV_DELETE_EVENT', req.user.id, { eventId: req.params.id }, req);
+    res.json({ message: 'Event deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dev: hard delete a user account — full cascade in a single atomic transaction
+app.delete('/api/admin/users/:id', authenticateToken, requireDev, (req, res) => {
+  const targetId = parseInt(req.params.id, 10);
+  if (isNaN(targetId)) return res.status(400).json({ error: 'Invalid user ID' });
+  if (targetId === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+
+  try {
+    const target = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    db.transaction(() => {
+      // trips.vaultLeaderId has no ON DELETE CASCADE — delete these vaults explicitly
+      db.prepare('DELETE FROM trips WHERE vaultLeaderId = ?').run(targetId);
+      // Deleting the user cascades all remaining associated data via FK ON DELETE CASCADE
+      db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+    })();
+
+    auditLog('DEV_DELETE_USER', req.user.id, { targetUserId: targetId, targetUsername: target.username }, req);
+    res.json({ message: 'User and all associated data permanently deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
