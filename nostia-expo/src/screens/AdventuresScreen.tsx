@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { adventuresAPI, feedAPI, tripsAPI, authAPI } from '../services/api';
+import { adventuresAPI, feedAPI, tripsAPI, authAPI, eventsAPI } from '../services/api';
 import CreatePostModal from '../components/CreatePostModal';
 import CommentsModal from '../components/CommentsModal';
 
@@ -27,7 +27,8 @@ export default function AdventuresScreen() {
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'adventures' | 'feed'>('adventures');
+  const [activeTab, setActiveTab] = useState<'adventures' | 'feed' | 'events'>('adventures');
+  const [allEvents, setAllEvents] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -54,16 +55,25 @@ export default function AdventuresScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [adventuresData, feedData, tripsData, userData] = await Promise.all([
+      const [adventuresData, feedData, tripsData, userData, eventsData] = await Promise.all([
         adventuresAPI.getAll(),
         feedAPI.getUserFeed(20),
         tripsAPI.getAll().catch(() => []),
         authAPI.getMe().catch(() => null),
+        eventsAPI.getAll().catch(() => []),
       ]);
       setAdventures(adventuresData);
       setFeed(feedData);
       setTrips(tripsData);
       setCurrentUser(userData);
+      // Going events first, then others — both sorted by date ascending
+      const sorted = [...eventsData].sort((a: any, b: any) => {
+        const aGoing = a.myRsvp === 'going' ? 0 : 1;
+        const bGoing = b.myRsvp === 'going' ? 0 : 1;
+        if (aGoing !== bGoing) return aGoing - bGoing;
+        return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
+      });
+      setAllEvents(sorted);
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.error || 'Failed to load data');
     } finally {
@@ -330,6 +340,19 @@ export default function AdventuresScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'events' && styles.activeTab]}
+          onPress={() => setActiveTab('events')}
+        >
+          <Ionicons
+            name="calendar"
+            size={20}
+            color={activeTab === 'events' ? '#FFFFFF' : '#9CA3AF'}
+          />
+          <Text style={[styles.tabText, activeTab === 'events' && styles.activeTabText]}>
+            Events
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'feed' && styles.activeTab]}
           onPress={() => setActiveTab('feed')}
         >
@@ -380,7 +403,50 @@ export default function AdventuresScreen() {
       )}
 
       {/* Content */}
-      {activeTab === 'adventures' ? (
+      {activeTab === 'events' ? (
+        <FlatList
+          data={allEvents}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />}
+          renderItem={({ item }) => (
+            <View style={[styles.eventCard, item.myRsvp === 'going' && styles.goingEventCard]}>
+              <View style={styles.eventCardHeader}>
+                <Text style={styles.eventCardTitle} numberOfLines={2}>{item.title}</Text>
+                {item.myRsvp === 'going' && (
+                  <View style={styles.goingBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                    <Text style={styles.goingBadgeText}>Going</Text>
+                  </View>
+                )}
+              </View>
+              {item.location ? (
+                <Text style={styles.eventCardMeta}>
+                  <Ionicons name="location-outline" size={13} /> {item.location}
+                </Text>
+              ) : null}
+              <Text style={styles.eventCardDate}>
+                {new Date(item.eventDate).toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
+              </Text>
+              {item.goingCount > 0 && (
+                <Text style={styles.eventCardAttendees}>
+                  <Ionicons name="people-outline" size={13} /> {item.goingCount} going
+                </Text>
+              )}
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="calendar-outline" size={64} color="#6B7280" />
+              <Text style={styles.emptyText}>No events yet</Text>
+              <Text style={styles.emptySubtext}>Check back soon!</Text>
+            </View>
+          }
+        />
+      ) : activeTab === 'adventures' ? (
         <>
           <FlatList
             data={filterAdventures()}
@@ -755,6 +821,60 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     textTransform: 'capitalize',
+  },
+  eventCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  goingEventCard: {
+    borderColor: '#065F46',
+    backgroundColor: '#052E16',
+  },
+  eventCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    gap: 8,
+  },
+  eventCardTitle: {
+    fontSize: ms(16),
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  goingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  goingBadgeText: {
+    fontSize: ms(11),
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  eventCardMeta: {
+    fontSize: ms(13),
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  eventCardDate: {
+    fontSize: ms(13),
+    color: '#F59E0B',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  eventCardAttendees: {
+    fontSize: ms(12),
+    color: '#6B7280',
   },
   feedCard: {
     backgroundColor: '#1F2937',

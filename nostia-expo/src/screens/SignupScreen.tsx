@@ -45,8 +45,8 @@ export default function SignupScreen() {
     if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
       return 'Username can only contain letters, numbers, and underscores';
     }
-    if (!password || password.length < 8) {
-      return 'Password must be at least 8 characters';
+    if (!password || password.length < 4) {
+      return 'Password must be at least 4 characters';
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return 'Please enter a valid email address';

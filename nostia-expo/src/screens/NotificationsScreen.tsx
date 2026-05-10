@@ -74,33 +74,41 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    // Mark as read
     if (!notification.read) {
       handleMarkAsRead(notification.id);
     }
 
-    // Navigate based on notification type
     const { type, data } = notification;
     switch (type) {
       case 'trip_invite':
-        // Navigate to trip invitations or trips tab
-        navigation.navigate('TripsTab');
+      case 'vault_payment':
+      case 'payment_received':
+        navigation.navigate('TripsTab' as never);
         break;
       case 'friend_request':
-        navigation.navigate('FriendsTab');
+      case 'new_follower':
+      case 'follow_request':
+        navigation.navigate('FriendsTab' as never);
         break;
       case 'message':
-        // Navigate to chat if conversation ID is available
+      case 'new_message':
         if (data?.conversationId) {
-          navigation.navigate('Chat', {
+          navigation.navigate('Chat' as never, {
             conversationId: data.conversationId,
             friendName: data.friendName || 'Chat',
             friendId: data.friendId,
-          });
+          } as never);
+        } else {
+          navigation.navigate('FriendsTab' as never);
         }
         break;
+      case 'event_rsvp':
+      case 'event_invite':
+      case 'rsvp':
+        navigation.navigate('DiscoverTab' as never);
+        break;
       default:
-        // Just mark as read
+        // No navigation — notification body is visible in the list
         break;
     }
   };

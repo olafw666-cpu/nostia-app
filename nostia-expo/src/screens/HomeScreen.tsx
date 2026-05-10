@@ -30,6 +30,7 @@ export default function HomeScreen() {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
   const [nearbyEvents, setNearbyEvents] = useState<any[]>([]);
+  const [goingEvents, setGoingEvents] = useState<any[]>([]);
   const locationFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -61,13 +62,19 @@ export default function HomeScreen() {
           console.log('Failed to update location on server:', error);
         }
 
-        // Fetch nearby events
+        // Fetch events visible from current location using radius-based map endpoint
         try {
-          const nearby = await eventsAPI.getNearby(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            50 // 50km radius
-          );
+          const lat = currentLocation.latitude;
+          const lng = currentLocation.longitude;
+          const latDelta = 50 / 111;
+          const lngDelta = 50 / (111 * Math.cos(lat * Math.PI / 180));
+          const nearby = await eventsAPI.getMap({
+            minLat: lat - latDelta,
+            maxLat: lat + latDelta,
+            minLng: lng - lngDelta,
+            maxLng: lng + lngDelta,
+            viewportRadiusMiles: 31,
+          });
           setNearbyEvents(nearby);
         } catch (error) {
           console.log('Failed to fetch nearby events:', error);
@@ -81,12 +88,13 @@ export default function HomeScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [userResult, tripsResult, eventsResult, friendsResult, feedResult] = await Promise.allSettled([
+      const [userResult, tripsResult, eventsResult, friendsResult, feedResult, goingResult] = await Promise.allSettled([
         authAPI.getMe(),
         tripsAPI.getAll(),
         eventsAPI.getUpcoming(5),
         friendsAPI.getAll(),
         feedAPI.getUserFeed(),
+        eventsAPI.getMine(),
       ]);
       if (userResult.status === 'fulfilled') {
         setUser(userResult.value);
@@ -99,6 +107,7 @@ export default function HomeScreen() {
       if (eventsResult.status === 'fulfilled') setEvents(eventsResult.value);
       if (friendsResult.status === 'fulfilled') setFriends(friendsResult.value);
       if (feedResult.status === 'fulfilled') setFeed(feedResult.value);
+      if (goingResult.status === 'fulfilled') setGoingEvents(goingResult.value || []);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load home data');
     } finally {
@@ -303,6 +312,40 @@ export default function HomeScreen() {
           {events.slice(0, 2).map((event: any) => (
             <View key={event.id} style={styles.eventPreviewCard}>
               <Text style={styles.eventPreviewTitle}>{event.title}</Text>
+              <Text style={styles.eventPreviewLocation}>
+                <Ionicons name="location-outline" size={14} /> {event.location}
+              </Text>
+              <Text style={styles.eventPreviewDate}>
+                {new Date(event.eventDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Events I'm Going To */}
+      {goingEvents.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Events I'm Going To</Text>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('DiscoverTab')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {goingEvents.slice(0, 3).map((event: any) => (
+            <View key={event.id} style={[styles.eventPreviewCard, styles.goingEventCard]}>
+              <View style={styles.eventPreviewHeader}>
+                <Text style={[styles.eventPreviewTitle, { flex: 1 }]}>{event.title}</Text>
+                <View style={styles.goingBadge}>
+                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                  <Text style={styles.goingBadgeText}>Going</Text>
+                </View>
+              </View>
               <Text style={styles.eventPreviewLocation}>
                 <Ionicons name="location-outline" size={14} /> {event.location}
               </Text>
@@ -568,6 +611,24 @@ const styles = StyleSheet.create({
   distanceText: {
     fontSize: ms(12),
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  goingEventCard: {
+    borderColor: '#065F46',
+    backgroundColor: '#052E16',
+  },
+  goingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  goingBadgeText: {
+    fontSize: ms(11),
+    color: '#10B981',
     fontWeight: '600',
   },
   feedCard: {
