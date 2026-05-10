@@ -247,7 +247,7 @@ app.get('/health', (req, res) => {
 // Register new user (requires location and data collection consent)
 app.post('/api/auth/register', authLimiter, [
   body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters').matches(/^[a-zA-Z0-9_]+$/).withMessage('Username can only contain letters, numbers, and underscores'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('password').isLength({ min: 4 }).withMessage('Password must be at least 4 characters'),
   body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 100 }),
   body('email').optional({ checkFalsy: true }).isEmail().withMessage('Invalid email format').normalizeEmail(),
   body('locationConsent').custom((value) => value === true).withMessage('Location consent is required'),

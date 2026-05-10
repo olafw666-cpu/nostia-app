@@ -338,6 +338,17 @@ export const eventsAPI = {
     const response = await api.delete(`/events/${id}`);
     return response.data;
   },
+
+  getMine: async () => {
+    const response = await api.get('/events/mine');
+    return response.data;
+  },
+
+  getMap: async (params: { minLat: number; maxLat: number; minLng: number; maxLng: number; viewportRadiusMiles?: number }) => {
+    const { minLat, maxLat, minLng, maxLng, viewportRadiusMiles = 20 } = params;
+    const response = await api.get(`/events/map?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&viewportRadiusMiles=${viewportRadiusMiles}`);
+    return response.data;
+  },
 };
 
 // ===== Notifications API =====
