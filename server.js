@@ -1799,6 +1799,17 @@ app.delete('/api/admin/users/:id', authenticateToken, requireDev, (req, res) => 
   }
 });
 
+// Dev: delete all past events (eventDate < now) — RSVPs and invitees cascade automatically
+app.delete('/api/admin/events/past', authenticateToken, requireDev, (req, res) => {
+  try {
+    const result = db.prepare(`DELETE FROM events WHERE eventDate < datetime('now')`).run();
+    auditLog('DEV_DELETE_PAST_EVENTS', req.user.id, { deleted: result.changes }, req);
+    res.json({ deleted: result.changes });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== ADMIN ROUTES ====================
 
 // Trigger aggregation
