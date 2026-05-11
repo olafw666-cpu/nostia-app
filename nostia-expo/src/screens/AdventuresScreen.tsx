@@ -19,7 +19,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { adventuresAPI, feedAPI, tripsAPI, authAPI, eventsAPI } from '../services/api';
-import { getCurrentLocation } from '../services/location';
 import CreatePostModal from '../components/CreatePostModal';
 import CommentsModal from '../components/CommentsModal';
 
@@ -50,48 +49,24 @@ export default function AdventuresScreen() {
   ];
 
   useEffect(() => {
-    loadAll();
+    loadData();
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [adventuresData, feedData, tripsData, userData] = await Promise.all([
+      const [adventuresData, feedData, tripsData, userData, eventsData] = await Promise.all([
         adventuresAPI.getAll(),
         feedAPI.getUserFeed(20),
         tripsAPI.getAll().catch(() => []),
         authAPI.getMe().catch(() => null),
+        eventsAPI.getAll().catch(() => []),
       ]);
       setAdventures(adventuresData);
       setFeed(feedData);
       setTrips(tripsData);
       setCurrentUser(userData);
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadLocationBasedEvents = async () => {
-    try {
-      const loc = await getCurrentLocation();
-      let eventsData: any[];
-      if (loc) {
-        const lat = loc.latitude;
-        const lng = loc.longitude;
-        const latDelta = 50 / 111;
-        const lngDelta = 50 / (111 * Math.cos(lat * Math.PI / 180));
-        eventsData = await eventsAPI.getMap({
-          minLat: lat - latDelta,
-          maxLat: lat + latDelta,
-          minLng: lng - lngDelta,
-          maxLng: lng + lngDelta,
-          viewportRadiusMiles: 31,
-        });
-      } else {
-        eventsData = await eventsAPI.getAll();
-      }
+      // Going events first, then others — both sorted by date ascending
       const sorted = [...eventsData].sort((a: any, b: any) => {
         const aGoing = a.myRsvp === 'going' ? 0 : 1;
         const bGoing = b.myRsvp === 'going' ? 0 : 1;
@@ -99,21 +74,16 @@ export default function AdventuresScreen() {
         return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
       });
       setAllEvents(sorted);
-    } catch {
-      try {
-        const eventsData = await eventsAPI.getAll();
-        setAllEvents(eventsData);
-      } catch {}
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to load data');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const loadAll = async () => {
-    await Promise.all([loadData(), loadLocationBasedEvents()]);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadAll();
+    await loadData();
     setRefreshing(false);
   };
 
