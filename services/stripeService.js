@@ -18,7 +18,7 @@ class StripeService {
   }
 
   static async createConnectAccount() {
-    return stripe.accounts.create({ type: 'standard', business_type: 'individual' });
+    return stripe.accounts.create({ type: 'express', business_type: 'individual' });
   }
 
   static async getOrCreateConnectAccount(userId) {
