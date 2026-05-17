@@ -1028,9 +1028,12 @@ app.post('/api/vault', authenticateToken, (req, res) => {
   }
 });
 
-// Mark split as paid
+// Mark split as paid — restricted to split owner
 app.put('/api/vault/splits/:splitId/paid', authenticateToken, (req, res) => {
   try {
+    const split = db.prepare('SELECT userId FROM vault_splits WHERE id = ?').get(req.params.splitId);
+    if (!split) return res.status(404).json({ error: 'Split not found' });
+    if (split.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     Vault.markSplitPaid(req.params.splitId);
     res.json({ message: 'Split marked as paid' });
   } catch (error) {
@@ -1038,14 +1041,16 @@ app.put('/api/vault/splits/:splitId/paid', authenticateToken, (req, res) => {
   }
 });
 
-// Delete vault entry — vault leader only
+// Delete vault entry — vault leader or expense creator
 app.delete('/api/vault/:id', authenticateToken, (req, res) => {
   try {
     const entry = Vault.findById(req.params.id);
     if (!entry) return res.status(404).json({ error: 'Expense not found' });
     const trip = Trip.findById(entry.tripId);
-    if (!trip || trip.vaultLeaderId !== req.user.id) {
-      return res.status(403).json({ error: 'Only the vault leader can delete expenses' });
+    const isLeader = trip && trip.vaultLeaderId === req.user.id;
+    const isCreator = entry.paidBy === req.user.id;
+    if (!isLeader && !isCreator) {
+      return res.status(403).json({ error: 'Only the vault leader or expense creator can delete expenses' });
     }
     Vault.deleteEntry(req.params.id);
     res.json({ message: 'Vault entry deleted' });
@@ -2252,10 +2257,139 @@ app.post('/api/vault/splits/:splitId/payment-intent', paymentLimiter, authentica
       VALUES (?, ?, ?, 'usd', 'pending', ?, ?, ?)
     `).run(splitId, intent.id, chargedAmount, req.user.id, split.paidBy, split.tripId);
 
-    res.json({ clientSecret: intent.client_secret, chargedAmount });
+    // Create ephemeral key for saved-card support in PaymentSheet
+    let customerId = null;
+    let ephemeralKeySecret = null;
+    const userRecord = db.prepare('SELECT stripe_customer_id FROM users WHERE id = ?').get(req.user.id);
+    if (userRecord?.stripe_customer_id) {
+      customerId = userRecord.stripe_customer_id;
+      try {
+        const ek = await stripe.ephemeralKeys.create({ customer: customerId }, { apiVersion: '2024-04-10' });
+        ephemeralKeySecret = ek.secret;
+      } catch (_) { /* non-fatal — PaymentSheet still works without saved cards */ }
+    }
+
+    res.json({ clientSecret: intent.client_secret, chargedAmount, customerId, ephemeralKeySecret });
   } catch (error) {
     console.error('Split payment intent error:', error.message);
     res.status(500).json({ error: 'Failed to create payment. Please try again.' });
+  }
+});
+
+// Bulk PaymentIntent — pay all outstanding splits in one charge
+// POST /api/vault/bulk-payment-intent  { splitIds: [Int], tripId: Int }
+app.post('/api/vault/bulk-payment-intent', paymentLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { splitIds, tripId } = req.body;
+    if (!Array.isArray(splitIds) || splitIds.length === 0) {
+      return res.status(400).json({ error: 'splitIds must be a non-empty array' });
+    }
+    const placeholders = splitIds.map(() => '?').join(',');
+    const splits = db.prepare(`
+      SELECT vs.*, ve.paidBy, ve.tripId AS entryTripId
+      FROM vault_splits vs
+      INNER JOIN vault_entries ve ON vs.vaultEntryId = ve.id
+      WHERE vs.id IN (${placeholders})
+    `).all(...splitIds);
+
+    if (splits.length !== splitIds.length) return res.status(404).json({ error: 'One or more splits not found' });
+    const forbidden = splits.find(s => s.userId !== req.user.id);
+    if (forbidden) return res.status(403).json({ error: 'Forbidden: you can only pay your own splits' });
+    const alreadyPaid = splits.find(s => s.paid);
+    if (alreadyPaid) return res.status(400).json({ error: 'One or more splits are already paid' });
+
+    const totalOwed = splits.reduce((sum, s) => sum + s.amount, 0);
+    const chargedAmount = calculateChargedAmount(totalOwed);
+
+    const Stripe = require('stripe');
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // Use the paidBy of the first split as transfer destination (all splits in a vault share the same leader)
+    const payer = db.prepare('SELECT stripe_account_id, onboarding_complete FROM users WHERE id = ?').get(splits[0].paidBy);
+    const intentParams = {
+      amount: Math.round(chargedAmount * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: { splitIds: splitIds.join(','), type: 'vault_bulk', tripId: String(tripId) }
+    };
+    if (payer?.stripe_account_id && payer.onboarding_complete) {
+      intentParams.transfer_data = {
+        destination: payer.stripe_account_id,
+        amount: Math.round(totalOwed * 100)
+      };
+    }
+    const intent = await stripe.paymentIntents.create(intentParams);
+
+    // Record a pending transaction per split — webhook will mark all paid on success
+    const insertTx = db.prepare(`
+      INSERT INTO vault_transactions (vaultSplitId, stripePaymentIntentId, amount, currency, status, payerUserId, recipientUserId, tripId)
+      VALUES (?, ?, ?, 'usd', 'pending', ?, ?, ?)
+    `);
+    for (const s of splits) {
+      insertTx.run(s.id, intent.id, s.amount, req.user.id, s.paidBy, s.entryTripId ?? tripId);
+    }
+
+    let customerId = null;
+    let ephemeralKeySecret = null;
+    const userRecord = db.prepare('SELECT stripe_customer_id FROM users WHERE id = ?').get(req.user.id);
+    if (userRecord?.stripe_customer_id) {
+      customerId = userRecord.stripe_customer_id;
+      try {
+        const ek = await stripe.ephemeralKeys.create({ customer: customerId }, { apiVersion: '2024-04-10' });
+        ephemeralKeySecret = ek.secret;
+      } catch (_) {}
+    }
+
+    res.json({ clientSecret: intent.client_secret, chargedAmount, customerId, ephemeralKeySecret, splitIds });
+  } catch (error) {
+    console.error('Bulk payment intent error:', error.message);
+    res.status(500).json({ error: 'Failed to create bulk payment. Please try again.' });
+  }
+});
+
+// Send expense reminder notification
+// POST /api/vault/remind  { targetUserId: Int, tripId: Int }
+app.post('/api/vault/remind', authenticateToken, (req, res) => {
+  try {
+    const { targetUserId, tripId } = req.body;
+    if (!targetUserId || !tripId) return res.status(400).json({ error: 'targetUserId and tripId are required' });
+
+    const trip = Trip.findById(tripId);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    const sender = db.prepare('SELECT id, username FROM users WHERE id = ?').get(req.user.id);
+    if (!sender) return res.status(404).json({ error: 'Sender not found' });
+
+    // Check permission: sender must be vault leader or expense creator for any split the target owes
+    const isLeader = trip.vaultLeaderId === req.user.id;
+    if (!isLeader) {
+      const owedSplits = db.prepare(`
+        SELECT vs.id FROM vault_splits vs
+        INNER JOIN vault_entries ve ON vs.vaultEntryId = ve.id
+        WHERE ve.tripId = ? AND vs.userId = ? AND vs.paid = 0 AND ve.paidBy = ?
+      `).all(tripId, targetUserId, req.user.id);
+      if (owedSplits.length === 0) {
+        return res.status(403).json({ error: 'You do not have permission to send this reminder' });
+      }
+    }
+
+    // Calculate outstanding balance for the target user
+    const summary = Vault.getTripSummary(tripId, targetUserId);
+    const targetBalance = summary.balances.find(b => b.id === targetUserId);
+    const outstanding = targetBalance ? Math.max(0, targetBalance.owes - targetBalance.paid) : 0;
+    if (outstanding <= 0) return res.status(400).json({ error: 'Member has no outstanding balance' });
+
+    NotificationService.saveNotification(
+      targetUserId,
+      'vault_reminder',
+      'Payment Reminder',
+      `@${sender.username} is reminding you that you have an outstanding balance of $${outstanding.toFixed(2)} in vault ${trip.title}.`,
+      { tripId }
+    );
+
+    res.json({ message: 'Reminder sent' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

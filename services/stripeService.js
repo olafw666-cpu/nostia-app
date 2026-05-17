@@ -95,7 +95,7 @@ class StripeService {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const pi = event.data.object;
-        const { vaultId, memberId, splitId, type } = pi.metadata || {};
+        const { vaultId, memberId, splitId, splitIds, type } = pi.metadata || {};
         if (type === 'vault_split' && splitId) {
           const splitIdInt = parseInt(splitId, 10);
           if (!Number.isInteger(splitIdInt)) { console.error('Webhook: invalid splitId in metadata', pi.id); break; }
@@ -104,6 +104,14 @@ class StripeService {
           db.prepare(`UPDATE vault_transactions SET status = 'completed', completedAt = CURRENT_TIMESTAMP WHERE stripePaymentIntentId = ?`)
             .run(pi.id);
           console.log(`✅ Vault split ${splitId} marked as paid via Stripe`);
+        } else if (type === 'vault_bulk' && splitIds) {
+          const ids = splitIds.split(',').map(id => parseInt(id, 10)).filter(n => Number.isInteger(n) && n > 0);
+          for (const id of ids) {
+            db.prepare(`UPDATE vault_splits SET paid = 1, paidViaStripe = 1, paidAt = CURRENT_TIMESTAMP WHERE id = ?`).run(id);
+          }
+          db.prepare(`UPDATE vault_transactions SET status = 'completed', completedAt = CURRENT_TIMESTAMP WHERE stripePaymentIntentId = ?`)
+            .run(pi.id);
+          console.log(`✅ Bulk vault splits [${splitIds}] marked as paid via Stripe`);
         } else if (vaultId && memberId) {
           const memberIdInt = parseInt(memberId, 10);
           const vaultIdInt = parseInt(vaultId, 10);
