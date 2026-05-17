@@ -145,7 +145,7 @@ class Vault {
       ORDER BY ve.date DESC
     `);
 
-    return stmt.all(tripId, userId);
+    return stmt.all(tripId, userId).map(s => ({ ...s, paid: s.paid === 1 }));
   }
 
   // Add a split to an entry
