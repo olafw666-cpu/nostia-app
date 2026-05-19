@@ -134,3 +134,12 @@ nostia-android/app/build/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Local documentation and planning files - NEVER commit these
+api_documentation.md
+deployment.md
+EXTERNAL_GUIDE.html
+external_todo.md
+implementation_plan.md
+nostia-ios-session-summary.md
+stripe_testing_guide.md
