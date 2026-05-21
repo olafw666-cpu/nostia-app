@@ -137,9 +137,14 @@ nostia-android/app/build/
 
 # Local documentation and planning files - NEVER commit these
 api_documentation.md
+API_DOCUMENTATION.md
 deployment.md
+DEPLOYMENT.md
 EXTERNAL_GUIDE.html
 external_todo.md
+EXTERNAL_TODO.md
 implementation_plan.md
+IMPLEMENTATION_PLAN.md
 nostia-ios-session-summary.md
 stripe_testing_guide.md
+STRIPE_TESTING_GUIDE.md
