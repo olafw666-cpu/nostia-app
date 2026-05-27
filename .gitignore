@@ -135,6 +135,9 @@ nostia-android/app/build/
 # yarn.lock
 # pnpm-lock.yaml
 
+# GeoJSON operational region files - NEVER commit these
+*.geojson
+
 # Local documentation and planning files - NEVER commit these
 api_documentation.md
 API_DOCUMENTATION.md
