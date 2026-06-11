@@ -270,4 +270,4 @@ Users who paid an expense must complete Stripe Connect onboarding before trip-ma
 
 ## License
 
-MIT
+Nostia LLC
