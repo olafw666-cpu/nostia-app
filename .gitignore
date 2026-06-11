@@ -139,6 +139,8 @@ nostia-android/app/build/
 *.geojson
 
 # Local documentation and planning files - NEVER commit these
+security_audit.md
+SECURITY_AUDIT.md
 api_documentation.md
 API_DOCUMENTATION.md
 deployment.md
